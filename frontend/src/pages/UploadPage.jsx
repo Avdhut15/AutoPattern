@@ -1,20 +1,20 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { UploadCloud, FileType } from 'lucide-react';
-import { useAppContext } from '../context/AppContext';
-import DataService from '../services/api';
+import { useDispatch, useSelector } from 'react-redux';
+import { uploadDataset } from '../store/datasetSlice';
 import PremiumCard from '../components/PremiumCard';
 import './UploadPage.css';
 
 const UploadPage = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [file, setFile] = useState(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [error, setError] = useState(null);
+  const [localError, setLocalError] = useState(null);
   const fileInputRef = useRef(null);
   
   const navigate = useNavigate();
-  const { setCurrentFile, setOriginalFileName } = useAppContext();
+  const dispatch = useDispatch();
+  const { uploadLoading, uploadError } = useSelector((state) => state.dataset);
 
   const handleDragOver = (e) => {
     e.preventDefault();
@@ -34,19 +34,19 @@ const UploadPage = () => {
     const isValid = validExtensions.some(ext => fileName.endsWith(ext));
     
     if (!isValid) {
-      setError("Please upload a valid CSV, Excel, or JSON file.");
+      setLocalError("Please upload a valid CSV, Excel, or JSON file.");
       setFile(null);
       return false;
     }
     
     // Check size (e.g., max 50MB)
     if (selectedFile.size > 50 * 1024 * 1024) {
-      setError("File is too large. Maximum size is 50MB.");
+      setLocalError("File is too large. Maximum size is 50MB.");
       setFile(null);
       return false;
     }
     
-    setError(null);
+    setLocalError(null);
     setFile(selectedFile);
     return true;
   };
@@ -73,25 +73,15 @@ const UploadPage = () => {
   const submitFile = async () => {
     if (!file) return;
     
-    setIsUploading(true);
-    setError(null);
+    setLocalError(null);
     
-    try {
-      const response = await DataService.uploadDataset(file);
-      
-      if (response.status === 'success') {
-        setCurrentFile(response.file_path);
-        setOriginalFileName(file.name);
-        navigate('/overview');
-      } else {
-        setError(response.message || 'Upload failed');
-      }
-    } catch (err) {
-      setError(err.response?.data?.detail || 'An error occurred during upload. Is the backend running?');
-    } finally {
-      setIsUploading(false);
+    const resultAction = await dispatch(uploadDataset(file));
+    if (uploadDataset.fulfilled.match(resultAction)) {
+      navigate('/overview');
     }
   };
+
+  const displayError = localError || uploadError;
 
   return (
     <div className="upload-page">
@@ -147,14 +137,14 @@ const UploadPage = () => {
           )}
         </div>
 
-        {error && <div className="error-message">{error}</div>}
+        {displayError && <div className="error-message">{displayError}</div>}
 
         <button 
-          className={`primary-btn upload-btn ${!file || isUploading ? 'disabled' : ''}`}
+          className={`primary-btn upload-btn ${!file || uploadLoading ? 'disabled' : ''}`}
           onClick={submitFile}
-          disabled={!file || isUploading}
+          disabled={!file || uploadLoading}
         >
-          {isUploading ? 'Uploading & Processing...' : 'Analyze Dataset'}
+          {uploadLoading ? 'Uploading & Processing...' : 'Analyze Dataset'}
         </button>
       </PremiumCard>
     </div>

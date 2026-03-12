@@ -2,20 +2,22 @@
 
 :root {
   /* Colors */
-  --bg-dark: #0f172a;
-  --bg-card: rgba(30, 41, 59, 0.7);
-  --bg-hover: rgba(51, 65, 85, 0.8);
+  --bg-dark: #121212; /* Neutral dark gray */
+  --bg-card: rgba(30, 30, 30, 0.7);
+  --bg-hover: rgba(45, 45, 45, 0.8);
   
   --text-primary: #f8fafc;
   --text-secondary: #94a3b8;
-  --text-muted: #64748b;
+  --text-muted: #6b6b6b;
   
-  --accent-primary: #3b82f6;
-  --accent-hover: #2563eb;
-  --accent-gradient: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+  --accent-primary: #3730a3; /* Deep indigo */
+  --accent-secondary: #0d9488; /* Teal */
+  --accent-hover: #4338ca;
+  --cyan-highlight: #06b6d4; /* Soft Cyan */
+  --accent-gradient: linear-gradient(135deg, #3730a3 0%, #0d9488 100%);
   
-  --border-light: rgba(255, 255, 255, 0.1);
-  --border-hover: rgba(255, 255, 255, 0.2);
+  --border-light: rgba(255, 255, 255, 0.08);
+  --border-hover: rgba(255, 255, 255, 0.15);
   
   --error: #ef4444;
   --success: #10b981;

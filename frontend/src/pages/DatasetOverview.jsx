@@ -1,39 +1,28 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAppContext } from '../context/AppContext';
-import DataService from '../services/api';
+import { useDispatch, useSelector } from 'react-redux';
+import { fetchSummary } from '../store/datasetSlice';
 import PremiumCard from '../components/PremiumCard';
 import { LoadingState, ErrorState, EmptyState } from '../components/StateComponents';
 import './DatasetOverview.css';
 
 const DatasetOverview = () => {
-  const { currentFile, originalFileName } = useAppContext();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [summaryData, setSummaryData] = useState(null);
-  
-  const fetchSummary = async () => {
-    if (!currentFile) return;
-    
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await DataService.getSummary(currentFile);
-      setSummaryData(data);
-    } catch (err) {
-      setError(err.response?.data?.detail || "Failed to load dataset summary. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { 
+    currentFile, 
+    originalFileName, 
+    summaryData, 
+    summaryLoading, 
+    summaryError 
+  } = useSelector((state) => state.dataset);
 
   useEffect(() => {
-    if (currentFile) {
-      fetchSummary();
+    if (currentFile && !summaryData && !summaryLoading) {
+      dispatch(fetchSummary());
     }
-  }, [currentFile]);
+  }, [currentFile, summaryData, summaryLoading, dispatch]);
 
   if (!currentFile) {
     return (
@@ -46,8 +35,8 @@ const DatasetOverview = () => {
     );
   }
 
-  if (loading) return <LoadingState message="Analyzing dataset structure and statistics..." />;
-  if (error) return <ErrorState error={error} onRetry={fetchSummary} />;
+  if (summaryLoading && !summaryData) return <LoadingState message="Analyzing dataset structure and statistics..." />;
+  if (summaryError && !summaryData) return <ErrorState error={summaryError} onRetry={() => dispatch(fetchSummary())} />;
   if (!summaryData) return null;
 
   return (

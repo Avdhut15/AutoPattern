@@ -1,40 +1,29 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAppContext } from '../context/AppContext';
-import DataService from '../services/api';
+import { useDispatch, useSelector } from 'react-redux';
+import { fetchInsights } from '../store/datasetSlice';
 import PremiumCard from '../components/PremiumCard';
 import { LoadingState, ErrorState, EmptyState } from '../components/StateComponents';
 import { Sparkles, CheckCircle2 } from 'lucide-react';
 import './InsightsPage.css';
 
 const InsightsPage = () => {
-  const { currentFile, originalFileName } = useAppContext();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [insights, setInsights] = useState([]);
-  
-  const fetchInsights = async () => {
-    if (!currentFile) return;
-    
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await DataService.getInsights(currentFile);
-      setInsights(data.insights || []);
-    } catch (err) {
-      setError(err.response?.data?.detail || "Failed to generate AI insights.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { 
+    currentFile, 
+    originalFileName, 
+    insightsData, 
+    insightsLoading, 
+    insightsError 
+  } = useSelector((state) => state.dataset);
 
   useEffect(() => {
-    if (currentFile) {
-      fetchInsights();
+    if (currentFile && !insightsData && !insightsLoading) {
+      dispatch(fetchInsights());
     }
-  }, [currentFile]);
+  }, [currentFile, insightsData, insightsLoading, dispatch]);
 
   if (!currentFile) {
     return (
@@ -47,8 +36,10 @@ const InsightsPage = () => {
     );
   }
 
-  if (loading) return <LoadingState message="Synthesizing analysis results into natural language insights..." />;
-  if (error) return <ErrorState error={error} onRetry={fetchInsights} />;
+  if (insightsLoading && !insightsData) return <LoadingState message="Synthesizing analysis results into natural language insights..." />;
+  if (insightsError && !insightsData) return <ErrorState error={insightsError} onRetry={() => dispatch(fetchInsights())} />;
+
+  const insights = insightsData?.insights || [];
 
   return (
     <div className="page-container">

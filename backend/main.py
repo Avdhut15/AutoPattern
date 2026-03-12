@@ -1,4 +1,5 @@
 import os
+import asyncio
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import shutil
@@ -10,7 +11,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from backend.models import UploadResponse, DatasetSummaryResponse, PatternAnalysisResponse, AnomalyDetectionResponse, DLAnomalyDetectionResponse
 from pydantic import BaseModel
-from typing import List
+from typing import List, Dict, Any
 from backend.utils import load_dataset
 from execution.preprocessing import get_summary_stats, load_and_clean_data, preprocess_features
 from execution.pattern_detection import detect_patterns
@@ -34,6 +35,11 @@ app.add_middleware(
 )
 
 TMP_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".tmp")
+if not os.path.exists(TMP_DIR):
+    os.makedirs(TMP_DIR)
+
+# Simple In-Memory Cache for processed results
+CACHE: Dict[str, Dict[str, Any]] = {}
 
 @app.get("/")
 def read_root():
@@ -46,15 +52,16 @@ async def upload_dataset(file: UploadFile = File(...)):
         
     ext = os.path.splitext(file.filename)[1].lower()
     if ext not in ['.csv', '.xlsx', '.xls', '.json']:
-        raise HTTPException(status_code=400, detail="Unsupported file format. Please upload CSV, Excel, or JSON.")
+        raise HTTPException(status_code=400, detail="Unsupported file format")
         
-    # Generate unique filename to avoid collisions
     unique_filename = f"{uuid.uuid4()}{ext}"
     file_path = os.path.join(TMP_DIR, unique_filename)
     
     try:
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+        def write_file():
+            with open(file_path, "wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+        await asyncio.to_thread(write_file)
             
         return UploadResponse(
             filename=file.filename,
@@ -66,31 +73,50 @@ async def upload_dataset(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/dataset_summary", response_model=DatasetSummaryResponse)
-def get_dataset_summary(file_path: str):
+async def get_dataset_summary(file_path: str):
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="File not found")
         
-    df = load_dataset(file_path)
-    if df is None:
-        raise HTTPException(status_code=500, detail="Error loading dataset")
+    if file_path in CACHE and "dataset_summary" in CACHE[file_path]:
+        return DatasetSummaryResponse(filename=os.path.basename(file_path), **CACHE[file_path]["dataset_summary"])
         
-    summary = get_summary_stats(df)
-    
-    return DatasetSummaryResponse(
-        filename=os.path.basename(file_path),
-        **summary
-    )
-
-@app.get("/pattern_analysis", response_model=PatternAnalysisResponse)
-def get_pattern_analysis(file_path: str):
-    if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail="File not found")
+    def _compute():
+        df = load_dataset(file_path)
+        if df is None:
+            raise ValueError("Error loading dataset")
+        return get_summary_stats(df)
         
     try:
+        summary = await asyncio.to_thread(_compute)
+        if file_path not in CACHE:
+            CACHE[file_path] = {}
+        CACHE[file_path]["dataset_summary"] = summary
+        
+        return DatasetSummaryResponse(
+            filename=os.path.basename(file_path),
+            **summary
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/pattern_analysis", response_model=PatternAnalysisResponse)
+async def get_pattern_analysis(file_path: str):
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File not found")
+        
+    if file_path in CACHE and "pattern_analysis" in CACHE[file_path]:
+        return PatternAnalysisResponse(filename=os.path.basename(file_path), **CACHE[file_path]["pattern_analysis"])
+        
+    def _compute():
         df = load_and_clean_data(file_path)
         df_processed, metadata = preprocess_features(df)
+        return detect_patterns(df_processed, metadata)
         
-        patterns = detect_patterns(df_processed, metadata)
+    try:
+        patterns = await asyncio.to_thread(_compute)
+        if file_path not in CACHE:
+            CACHE[file_path] = {}
+        CACHE[file_path]["pattern_analysis"] = patterns
         
         return PatternAnalysisResponse(
             filename=os.path.basename(file_path),
@@ -100,15 +126,23 @@ def get_pattern_analysis(file_path: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/anomaly_detection", response_model=AnomalyDetectionResponse)
-def get_anomaly_detection(file_path: str):
+async def get_anomaly_detection(file_path: str):
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="File not found")
         
-    try:
+    if file_path in CACHE and "anomaly_detection" in CACHE[file_path]:
+        return AnomalyDetectionResponse(filename=os.path.basename(file_path), **CACHE[file_path]["anomaly_detection"])
+        
+    def _compute():
         df = load_and_clean_data(file_path)
         df_processed, metadata = preprocess_features(df)
+        return detect_anomalies(df_processed, metadata)
         
-        anomalies = detect_anomalies(df_processed, metadata)
+    try:
+        anomalies = await asyncio.to_thread(_compute)
+        if file_path not in CACHE:
+            CACHE[file_path] = {}
+        CACHE[file_path]["anomaly_detection"] = anomalies
         
         return AnomalyDetectionResponse(
             filename=os.path.basename(file_path),
@@ -118,15 +152,23 @@ def get_anomaly_detection(file_path: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/dl_anomaly_detection", response_model=DLAnomalyDetectionResponse)
-def get_dl_anomaly_detection(file_path: str):
+async def get_dl_anomaly_detection(file_path: str):
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="File not found")
         
-    try:
+    if file_path in CACHE and "dl_anomaly_detection" in CACHE[file_path]:
+        return DLAnomalyDetectionResponse(filename=os.path.basename(file_path), **CACHE[file_path]["dl_anomaly_detection"])
+        
+    def _compute():
         df = load_and_clean_data(file_path)
         df_processed, metadata = preprocess_features(df)
+        return detect_dl_anomalies(df_processed, metadata)
         
-        anomalies = detect_dl_anomalies(df_processed, metadata)
+    try:
+        anomalies = await asyncio.to_thread(_compute)
+        if file_path not in CACHE:
+            CACHE[file_path] = {}
+        CACHE[file_path]["dl_anomaly_detection"] = anomalies
         
         return DLAnomalyDetectionResponse(
             filename=os.path.basename(file_path),
@@ -136,43 +178,70 @@ def get_dl_anomaly_detection(file_path: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/visualizations")
-def get_visualizations(file_path: str):
-    """Returns data for all frontend charts"""
+async def get_visualizations(file_path: str):
+    """Returns data for all frontend charts, parallelized calculation"""
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="File not found")
         
-    try:
+    if file_path in CACHE and "visualizations" in CACHE[file_path]:
+        return CACHE[file_path]["visualizations"]
+        
+    def _preprocess():
         df = load_and_clean_data(file_path)
         df_processed, metadata = preprocess_features(df)
+        return df_processed, metadata
         
-        patterns = detect_patterns(df_processed, metadata)
-        anomalies = detect_anomalies(df_processed, metadata)
-        dl_anomalies = detect_dl_anomalies(df_processed, metadata)
+    try:
+        df_processed, metadata = await asyncio.to_thread(_preprocess)
         
-        return {
+        patterns, anomalies, dl_anomalies = await asyncio.gather(
+            asyncio.to_thread(detect_patterns, df_processed, metadata),
+            asyncio.to_thread(detect_anomalies, df_processed, metadata),
+            asyncio.to_thread(detect_dl_anomalies, df_processed, metadata)
+        )
+        
+        result = {
             "filename": os.path.basename(file_path),
             "patterns": patterns,
             "anomalies": anomalies,
             "dl_anomalies": dl_anomalies
         }
+        
+        if file_path not in CACHE:
+            CACHE[file_path] = {}
+        CACHE[file_path]["visualizations"] = result
+        
+        return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/insights", response_model=InsightsResponse)
-def get_insights(file_path: str):
-    """Generates human-readable insights"""
+async def get_insights(file_path: str):
+    """Generates human-readable insights with parallel execution"""
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="File not found")
         
-    try:
+    if file_path in CACHE and "insights" in CACHE[file_path]:
+        return InsightsResponse(filename=os.path.basename(file_path), insights=CACHE[file_path]["insights"])
+        
+    def _preprocess():
         df = load_and_clean_data(file_path)
-        df_processed, metadata = preprocess_features(df)
+        return df, *preprocess_features(df)
         
-        patterns = detect_patterns(df_processed, metadata)
-        anomalies = detect_anomalies(df_processed, metadata)
-        dl_anomalies = detect_dl_anomalies(df_processed, metadata)
+    try:
+        df, df_processed, metadata = await asyncio.to_thread(_preprocess)
         
-        insights_list = generate_insights(df, patterns, anomalies, dl_anomalies)
+        patterns, anomalies, dl_anomalies = await asyncio.gather(
+            asyncio.to_thread(detect_patterns, df_processed, metadata),
+            asyncio.to_thread(detect_anomalies, df_processed, metadata),
+            asyncio.to_thread(detect_dl_anomalies, df_processed, metadata)
+        )
+        
+        insights_list = await asyncio.to_thread(generate_insights, df, patterns, anomalies, dl_anomalies)
+        
+        if file_path not in CACHE:
+            CACHE[file_path] = {}
+        CACHE[file_path]["insights"] = insights_list
         
         return InsightsResponse(
             filename=os.path.basename(file_path),

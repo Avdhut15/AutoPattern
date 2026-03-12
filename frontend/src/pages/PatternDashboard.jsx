@@ -1,40 +1,29 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAppContext } from '../context/AppContext';
-import DataService from '../services/api';
+import { useDispatch, useSelector } from 'react-redux';
+import { fetchVisualizations } from '../store/datasetSlice';
 import PremiumCard from '../components/PremiumCard';
 import { LoadingState, ErrorState, EmptyState } from '../components/StateComponents';
 import { DynamicScatterChart } from '../components/DynamicChart';
 import './PatternDashboard.css';
 
 const PatternDashboard = () => {
-  const { currentFile, originalFileName } = useAppContext();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [patternData, setPatternData] = useState(null);
-  
-  const fetchPatterns = async () => {
-    if (!currentFile) return;
-    
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await DataService.getPatterns(currentFile);
-      setPatternData(data);
-    } catch (err) {
-      setError(err.response?.data?.detail || "Failed to load patterns. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { 
+    currentFile, 
+    originalFileName, 
+    visualizationData, 
+    visualizationLoading, 
+    visualizationError 
+  } = useSelector((state) => state.dataset);
 
   useEffect(() => {
-    if (currentFile) {
-      fetchPatterns();
+    if (currentFile && !visualizationData && !visualizationLoading) {
+      dispatch(fetchVisualizations());
     }
-  }, [currentFile]);
+  }, [currentFile, visualizationData, visualizationLoading, dispatch]);
 
   if (!currentFile) {
     return (
@@ -47,9 +36,11 @@ const PatternDashboard = () => {
     );
   }
 
-  if (loading) return <LoadingState message="Running clustering and dimensionality reduction algorithms..." />;
-  if (error) return <ErrorState error={error} onRetry={fetchPatterns} />;
-  if (!patternData) return null;
+  if (visualizationLoading && !visualizationData) return <LoadingState message="Running clustering and dimensionality reduction algorithms..." />;
+  if (visualizationError && !visualizationData) return <ErrorState error={visualizationError} onRetry={() => dispatch(fetchVisualizations())} />;
+  if (!visualizationData) return null;
+
+  const patternData = visualizationData.patterns || {};
 
   // Process PCA + KMeans data for the scatter plot
   const pcaProjections = patternData.pca?.projections || [];

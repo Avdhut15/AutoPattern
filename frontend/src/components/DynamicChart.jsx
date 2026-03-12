@@ -4,7 +4,14 @@ import {
 } from 'recharts';
 
 const CHART_COLORS = [
-  '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'
+  '#0d9488', // Teal
+  '#3730a3', // Indigo
+  '#06b6d4', // Cyan
+  '#6366f1', // Soft visual purple/indigo
+  '#14b8a6', // Light teal
+  '#818cf8', // Lighter purple
+  '#0ea5e9', // Sky blue
+  '#2dd4bf'  // Light cyan
 ];
 
 export const DynamicScatterChart = ({ data, xKey = 'x', yKey = 'y', zKey = 'z', clusterKey = 'cluster', xAxisLabel = 'X', yAxisLabel = 'Y' }) => {
