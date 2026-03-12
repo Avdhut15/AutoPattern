@@ -1,46 +1,29 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAppContext } from '../context/AppContext';
-import DataService from '../services/api';
+import { useDispatch, useSelector } from 'react-redux';
+import { fetchVisualizations } from '../store/datasetSlice';
 import PremiumCard from '../components/PremiumCard';
 import { LoadingState, ErrorState, EmptyState } from '../components/StateComponents';
 import { DynamicScatterChart } from '../components/DynamicChart';
 import './PatternDashboard.css';
 
 const AnomalyDashboard = () => {
-  const { currentFile, originalFileName } = useAppContext();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [isoData, setIsoData] = useState(null);
-  const [dlData, setDlData] = useState(null);
-  
-  const fetchData = async () => {
-    if (!currentFile) return;
-    
-    setLoading(true);
-    setError(null);
-    try {
-      // Fetch both simultaneously
-      const [isoRes, dlRes] = await Promise.all([
-        DataService.getAnomalies(currentFile),
-        DataService.getDLAnomalies(currentFile)
-      ]);
-      setIsoData(isoRes);
-      setDlData(dlRes);
-    } catch (err) {
-      setError(err.response?.data?.detail || "Failed to load anomaly detection data.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { 
+    currentFile, 
+    originalFileName, 
+    visualizationData, 
+    visualizationLoading, 
+    visualizationError 
+  } = useSelector((state) => state.dataset);
 
   useEffect(() => {
-    if (currentFile) {
-      fetchData();
+    if (currentFile && !visualizationData && !visualizationLoading) {
+      dispatch(fetchVisualizations());
     }
-  }, [currentFile]);
+  }, [currentFile, visualizationData, visualizationLoading, dispatch]);
 
   if (!currentFile) {
     return (
@@ -53,8 +36,12 @@ const AnomalyDashboard = () => {
     );
   }
 
-  if (loading) return <LoadingState message="Running Isolation Forest and Deep Autoencoders..." />;
-  if (error) return <ErrorState error={error} onRetry={fetchData} />;
+  if (visualizationLoading && !visualizationData) return <LoadingState message="Running Isolation Forest and Deep Autoencoders..." />;
+  if (visualizationError && !visualizationData) return <ErrorState error={visualizationError} onRetry={() => dispatch(fetchVisualizations())} />;
+  if (!visualizationData) return null;
+
+  const isoData = visualizationData.anomalies || {};
+  const dlData = visualizationData.dl_anomalies || {};
   
   // Format data for ScatterChart components
   // We use the index as x-axis and the anomaly score / reconstruction error as y-axis
