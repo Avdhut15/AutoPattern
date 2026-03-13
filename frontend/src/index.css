@@ -1,38 +1,52 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 :root {
-  /* Colors */
-  --bg-dark: #121212; /* Neutral dark gray */
-  --bg-card: rgba(30, 30, 30, 0.7);
-  --bg-hover: rgba(45, 45, 45, 0.8);
+  /* Colors - Soft UI Light Theme */
+  --bg-global: #F4F7FC;
+  --bg-card: #FFFFFF;
+  --bg-hover: #F8FAFC;
   
-  --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-  --text-muted: #6b6b6b;
+  --text-primary: #0F172A;
+  --text-secondary: #64748B;
+  --text-muted: #94A3B8;
   
-  --accent-primary: #3730a3; /* Deep indigo */
-  --accent-secondary: #0d9488; /* Teal */
-  --accent-hover: #4338ca;
-  --cyan-highlight: #06b6d4; /* Soft Cyan */
-  --accent-gradient: linear-gradient(135deg, #3730a3 0%, #0d9488 100%);
+  --brand-primary: #3B82F6;
+  --brand-hover: #2563EB;
   
-  --border-light: rgba(255, 255, 255, 0.08);
-  --border-hover: rgba(255, 255, 255, 0.15);
+  /* Semantic Tints (Backgrounds for icons/stats) */
+  --tint-blue: #EFF6FF;
+  --tint-blue-dark: #BFDBFE;
   
-  --error: #ef4444;
-  --success: #10b981;
-  --warning: #f59e0b;
+  --tint-green: #F0FDF4;
+  --tint-green-dark: #BBF7D0;
   
-  /* Shadows & Blur */
-  --glass-blur: blur(12px);
-  --shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.2), 0 4px 6px -2px rgba(0, 0, 0, 0.1);
-  --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
+  --tint-purple: #FAF5FF;
+  --tint-purple-dark: #E9D5FF;
+  
+  --tint-orange: #FFF7ED;
+  --tint-orange-dark: #FED7AA;
+
+  --tint-red: #FEF2F2;
+  --tint-red-dark: #FECACA;
+
+  --border-light: #E2E8F0;
+  --border-active: #CBD5E1;
+  
+  /* Status Colors */
+  --error: #EF4444;
+  --success: #10B981;
+  --warning: #F59E0B;
+  
+  /* Shadows */
+  --shadow-soft: 0 4px 20px rgba(0, 0, 0, 0.03);
+  --shadow-hover: 0 10px 25px rgba(0, 0, 0, 0.06);
+  --shadow-inner: inset 0 2px 4px 0 rgba(0, 0, 0, 0.02);
   
   /* Radii */
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
+  --radius-xl: 20px;
   --radius-full: 9999px;
   
   /* Transitions */
@@ -48,30 +62,28 @@
 
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  background-color: var(--bg-dark);
+  background-color: var(--bg-global);
   color: var(--text-primary);
   min-height: 100vh;
   overflow-x: hidden;
-  background-image: 
-    radial-gradient(circle at 15% 50%, rgba(59, 130, 246, 0.15) 0%, transparent 50%),
-    radial-gradient(circle at 85% 30%, rgba(139, 92, 246, 0.15) 0%, transparent 50%);
-  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
 }
 
 #root {
   display: flex;
+  flex-direction: column;
   min-height: 100vh;
   width: 100%;
 }
 
 a {
-  color: var(--accent-primary);
+  color: var(--brand-primary);
   text-decoration: none;
   transition: color var(--transition-fast);
 }
 
 a:hover {
-  color: var(--accent-hover);
+  color: var(--brand-hover);
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -80,14 +92,24 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--text-primary);
 }
 
-/* Glassmorphism Classes */
-.glass-panel {
+/* Base Card Class */
+.card {
   background: var(--bg-card);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--border-light);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-soft);
+  border: 1px solid rgba(0,0,0,0.02);
+  transition: box-shadow var(--transition-normal);
+}
+
+/* Main Container to restrict width */
+.main-container {
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 2rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Scrollbar */
@@ -97,22 +119,30 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--bg-dark);
+  background: var(--bg-global);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--border-light);
+  background: #CBD5E1;
   border-radius: var(--radius-full);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--text-muted);
+  background: #94A3B8;
 }
 
-/* Typography Utilities */
-.text-gradient {
-  background: var(--accent-gradient);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+/* Animations */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.4s ease forwards;
 }
