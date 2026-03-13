@@ -14,7 +14,10 @@ def load_dataset(file_path: str) -> Optional[pd.DataFrame]:
     
     try:
         if ext == '.csv':
-            return pd.read_csv(file_path)
+            try:
+                return pd.read_csv(file_path, encoding='utf-8')
+            except UnicodeDecodeError:
+                return pd.read_csv(file_path, encoding='latin1')
         elif ext in ['.xls', '.xlsx']:
             return pd.read_excel(file_path)
         elif ext == '.json':

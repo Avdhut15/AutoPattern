@@ -9,7 +9,10 @@ def load_and_clean_data(file_path: str) -> pd.DataFrame:
     """
     ext = file_path.split('.')[-1].lower()
     if ext == 'csv':
-        df = pd.read_csv(file_path)
+        try:
+            df = pd.read_csv(file_path, encoding='utf-8')
+        except UnicodeDecodeError:
+            df = pd.read_csv(file_path, encoding='latin1')
     elif ext in ['xls', 'xlsx']:
         df = pd.read_excel(file_path)
     elif ext == 'json':
