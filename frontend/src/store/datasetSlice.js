@@ -1,84 +1,54 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import DataService from '../services/api';
 
+// Single unified thunk: upload → analyze (AI recommend + all models + insights in one call)
 export const uploadDataset = createAsyncThunk(
   'dataset/upload',
   async (file, { rejectWithValue }) => {
     try {
       const data = await DataService.uploadDataset(file);
-      return { 
-        currentFile: data.file_path, 
-        originalFileName: file.name 
+      return {
+        currentFile: data.file_path,
+        originalFileName: file.name,
       };
     } catch (err) {
-      return rejectWithValue(err.response?.data?.detail || "Upload failed");
+      return rejectWithValue(err.response?.data?.detail || 'Upload failed');
     }
   }
 );
 
-export const fetchSummary = createAsyncThunk(
-  'dataset/fetchSummary',
+export const fetchAnalysis = createAsyncThunk(
+  'dataset/fetchAnalysis',
   async (_, { getState, rejectWithValue }) => {
     const { dataset } = getState();
-    if (!dataset.currentFile) return rejectWithValue("No file uploaded");
-    if (dataset.summaryData) return dataset.summaryData;
-    
+    if (!dataset.currentFile) return rejectWithValue('No file uploaded');
+    if (dataset.analysisData) return dataset.analysisData; // Already cached in Redux
     try {
-      return await DataService.getSummary(dataset.currentFile);
+      return await DataService.analyzeDataset(dataset.currentFile);
     } catch (err) {
-      return rejectWithValue(err.response?.data?.detail || "Failed to load summary");
-    }
-  }
-);
-
-export const fetchVisualizations = createAsyncThunk(
-  'dataset/fetchVisualizations',
-  async (_, { getState, rejectWithValue }) => {
-    const { dataset } = getState();
-    if (!dataset.currentFile) return rejectWithValue("No file uploaded");
-    if (dataset.visualizationData) return dataset.visualizationData;
-
-    try {
-      return await DataService.getVisualizations(dataset.currentFile);
-    } catch (err) {
-      return rejectWithValue(err.response?.data?.detail || "Failed to load visualizations");
-    }
-  }
-);
-
-export const fetchInsights = createAsyncThunk(
-  'dataset/fetchInsights',
-  async (_, { getState, rejectWithValue }) => {
-    const { dataset } = getState();
-    if (!dataset.currentFile) return rejectWithValue("No file uploaded");
-    if (dataset.insightsData) return dataset.insightsData;
-
-    try {
-      return await DataService.getInsights(dataset.currentFile);
-    } catch (err) {
-      return rejectWithValue(err.response?.data?.detail || "Failed to load insights");
+      return rejectWithValue(err.response?.data?.detail || 'Analysis failed');
     }
   }
 );
 
 const initialState = {
   currentFile: null,
-  originalFileName: "",
-  
-  summaryData: null,
-  summaryLoading: false,
-  summaryError: null,
-  
-  visualizationData: null,
-  visualizationLoading: false,
-  visualizationError: null,
+  originalFileName: '',
 
-  insightsData: null,
-  insightsLoading: false,
-  insightsError: null,
-  
+  // Upload
   uploadLoading: false,
-  uploadError: null
+  uploadError: null,
+
+  // Unified analysis
+  analysisData: null,
+  analysisLoading: false,
+  analysisError: null,
+
+  // Derived convenience fields (populated from analysisData)
+  summaryData: null,
+  visualizationData: null,
+  insightsData: null,
+  recommendationData: null,
 };
 
 const datasetSlice = createSlice({
@@ -96,10 +66,13 @@ const datasetSlice = createSlice({
       })
       .addCase(uploadDataset.fulfilled, (state, action) => {
         state.uploadLoading = false;
-        // On new upload, reset everything else
+        // Reset analysis state for new file
+        state.analysisData = null;
         state.summaryData = null;
         state.visualizationData = null;
         state.insightsData = null;
+        state.recommendationData = null;
+        state.analysisError = null;
         state.currentFile = action.payload.currentFile;
         state.originalFileName = action.payload.originalFileName;
       })
@@ -107,49 +80,30 @@ const datasetSlice = createSlice({
         state.uploadLoading = false;
         state.uploadError = action.payload;
       })
-      
-      // Summary
-      .addCase(fetchSummary.pending, (state) => {
-        if (!state.summaryData) state.summaryLoading = true;
-        state.summaryError = null;
+
+      // Unified analysis
+      .addCase(fetchAnalysis.pending, (state) => {
+        if (!state.analysisData) state.analysisLoading = true;
+        state.analysisError = null;
       })
-      .addCase(fetchSummary.fulfilled, (state, action) => {
-        state.summaryLoading = false;
-        state.summaryData = action.payload;
+      .addCase(fetchAnalysis.fulfilled, (state, action) => {
+        state.analysisLoading = false;
+        state.analysisData = action.payload;
+        // Populate derived fields for backward-compat with existing panels
+        state.summaryData = action.payload.summary || null;
+        state.visualizationData = {
+          patterns: action.payload.patterns || {},
+          anomalies: action.payload.anomalies || {},
+          dl_anomalies: action.payload.dl_anomalies || {},
+        };
+        state.insightsData = action.payload.insights || [];
+        state.recommendationData = action.payload.recommendation || null;
       })
-      .addCase(fetchSummary.rejected, (state, action) => {
-        state.summaryLoading = false;
-        state.summaryError = action.payload;
-      })
-      
-      // Visualizations
-      .addCase(fetchVisualizations.pending, (state) => {
-        if (!state.visualizationData) state.visualizationLoading = true;
-        state.visualizationError = null;
-      })
-      .addCase(fetchVisualizations.fulfilled, (state, action) => {
-        state.visualizationLoading = false;
-        state.visualizationData = action.payload;
-      })
-      .addCase(fetchVisualizations.rejected, (state, action) => {
-        state.visualizationLoading = false;
-        state.visualizationError = action.payload;
-      })
-      
-      // Insights
-      .addCase(fetchInsights.pending, (state) => {
-        if (!state.insightsData) state.insightsLoading = true;
-        state.insightsError = null;
-      })
-      .addCase(fetchInsights.fulfilled, (state, action) => {
-        state.insightsLoading = false;
-        state.insightsData = action.payload;
-      })
-      .addCase(fetchInsights.rejected, (state, action) => {
-        state.insightsLoading = false;
-        state.insightsError = action.payload;
+      .addCase(fetchAnalysis.rejected, (state, action) => {
+        state.analysisLoading = false;
+        state.analysisError = action.payload;
       });
-  }
+  },
 });
 
 export const { resetState } = datasetSlice.actions;

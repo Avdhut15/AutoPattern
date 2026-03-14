@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { fetchSummary, fetchVisualizations, fetchInsights } from './store/datasetSlice';
+import { fetchAnalysis } from './store/datasetSlice';
 
 import Header from './components/Header';
 import UploadView from './views/UploadView';
@@ -13,59 +13,38 @@ const AppContent = () => {
   
   const { 
     currentFile,
-    uploadLoading, summaryLoading, visualizationLoading, insightsLoading,
-    uploadError, summaryError, visualizationError, insightsError,
-    summaryData, visualizationData, insightsData
+    uploadLoading, uploadError,
+    analysisData, analysisLoading, analysisError,
   } = useSelector((state) => state.dataset);
 
-  // Orchestrate the fetching process once a file is uploaded
+  // Once file is uploaded, kick off the unified analysis
   useEffect(() => {
-    if (currentFile && !uploadLoading) {
-      if (!summaryData && !summaryLoading && !summaryError) {
-        dispatch(fetchSummary());
-      } else if (summaryData && !visualizationData && !visualizationLoading && !visualizationError) {
-        dispatch(fetchVisualizations());
-      } else if (visualizationData && !insightsData && !insightsLoading && !insightsError) {
-        dispatch(fetchInsights());
-      }
+    if (currentFile && !uploadLoading && !analysisData && !analysisLoading && !analysisError) {
+      dispatch(fetchAnalysis());
     }
-  }, [
-    currentFile, uploadLoading,
-    summaryData, summaryLoading, summaryError,
-    visualizationData, visualizationLoading, visualizationError,
-    insightsData, insightsLoading, insightsError,
-    dispatch
-  ]);
+  }, [currentFile, uploadLoading, analysisData, analysisLoading, analysisError, dispatch]);
 
-  // State Router
   const renderCurrentView = () => {
-    // 1. Error State
-    if (uploadError || summaryError || visualizationError || insightsError) {
+    // 1. Error
+    if (uploadError || analysisError) {
       return <ErrorView />;
     }
 
-    // 2. Upload State (Initial)
+    // 2. Upload (initial)
     if (!currentFile && !uploadLoading) {
       return <UploadView />;
     }
 
-    // 3. Processing State
-    if (
-      uploadLoading || 
-      summaryLoading || 
-      visualizationLoading || 
-      insightsLoading ||
-      (currentFile && (!summaryData || !visualizationData || !insightsData)) // Missing data but no error yet
-    ) {
+    // 3. Processing
+    if (uploadLoading || analysisLoading || (currentFile && !analysisData)) {
       return <ProcessingView />;
     }
 
-    // 4. Results State
-    if (summaryData && visualizationData && insightsData) {
+    // 4. Results
+    if (analysisData) {
       return <ResultsView />;
     }
 
-    // Fallback
     return <UploadView />;
   };
 

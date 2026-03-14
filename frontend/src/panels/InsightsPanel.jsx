@@ -1,55 +1,72 @@
 import React from 'react';
 import { useSelector } from 'react-redux';
-import { Lightbulb, TrendingUp, Network, AlertTriangle, ShieldAlert, FileText } from 'lucide-react';
+import { Lightbulb, TrendingUp, Network, AlertTriangle, ShieldAlert, FileText, Zap, BarChart3 } from 'lucide-react';
 
 const InsightsPanel = () => {
   const { insightsData } = useSelector(state => state.dataset);
-  
-  if (!insightsData || !insightsData.insights) {
+
+  // insightsData is a flat array of strings from the unified /analyze endpoint
+  if (!insightsData || !Array.isArray(insightsData) || insightsData.length === 0) {
     return <div className="p-4" style={{ color: 'var(--text-secondary)' }}>Gathering insights...</div>;
   }
 
-  const { insights } = insightsData;
+  const insights = insightsData;
 
   const determineInsightType = (text) => {
     const lower = text.toLowerCase();
-    if (lower.includes('correlates')) {
-      return { 
-        title: 'High Correlation', 
-        icon: <TrendingUp size={20} />, 
-        color: 'var(--brand-primary)', 
-        bg: 'var(--tint-blue)' 
+    if (lower.includes('correlat')) {
+      return {
+        title: 'Correlation Insight',
+        icon: <TrendingUp size={20} />,
+        color: 'var(--brand-primary)',
+        bg: 'var(--tint-blue)'
       };
     }
-    if (lower.includes('cluster') || lower.includes('dbscan') || lower.includes('kmeans')) {
-      return { 
-        title: 'Structure Detected', 
-        icon: <Network size={20} />, 
-        color: '#9333ea', 
-        bg: 'var(--tint-purple)' 
+    if (lower.includes('cluster') || lower.includes('dbscan') || lower.includes('kmeans') || lower.includes('group')) {
+      return {
+        title: 'Clustering Pattern',
+        icon: <Network size={20} />,
+        color: '#9333ea',
+        bg: 'var(--tint-purple)'
       };
     }
-    if (lower.includes('isolation forest') || lower.includes('anomaly')) {
-      return { 
-        title: 'Statistical Anomalies', 
-        icon: <AlertTriangle size={20} />, 
-        color: 'var(--warning)', 
-        bg: 'var(--tint-orange)' 
+    if (lower.includes('isolation forest') || lower.includes('anomal') || lower.includes('outlier')) {
+      return {
+        title: 'Anomaly Detection',
+        icon: <AlertTriangle size={20} />,
+        color: 'var(--warning)',
+        bg: 'var(--tint-orange)'
       };
     }
-    if (lower.includes('autoencoder') || lower.includes('deep learning')) {
-      return { 
-        title: 'Deep Learning Anomalies', 
-        icon: <ShieldAlert size={20} />, 
-        color: 'var(--error)', 
-        bg: 'var(--tint-red)' 
+    if (lower.includes('autoencoder') || lower.includes('deep learning') || lower.includes('reconstruction')) {
+      return {
+        title: 'Deep Learning Insight',
+        icon: <ShieldAlert size={20} />,
+        color: 'var(--error)',
+        bg: 'var(--tint-red)'
       };
     }
-    return { 
-      title: 'General Observation', 
-      icon: <FileText size={20} />, 
-      color: 'var(--success)', 
-      bg: 'var(--tint-green)' 
+    if (lower.includes('recommend') || lower.includes('suggest') || lower.includes('consider') || lower.includes('action')) {
+      return {
+        title: 'Recommendation',
+        icon: <Zap size={20} />,
+        color: '#0d9488',
+        bg: '#F0FDFA'
+      };
+    }
+    if (lower.includes('distribution') || lower.includes('feature') || lower.includes('column') || lower.includes('data quality')) {
+      return {
+        title: 'Data Quality',
+        icon: <BarChart3 size={20} />,
+        color: '#06b6d4',
+        bg: '#ECFEFF'
+      };
+    }
+    return {
+      title: 'General Observation',
+      icon: <FileText size={20} />,
+      color: 'var(--success)',
+      bg: 'var(--tint-green)'
     };
   };
 
@@ -68,8 +85,8 @@ const InsightsPanel = () => {
       marginBottom: '0.5rem',
     },
     titleIcon: {
-      backgroundColor: 'var(--tint-blue-dark)',
-      color: 'var(--brand-primary)',
+      background: 'linear-gradient(135deg, var(--brand-primary), #9333ea)',
+      color: 'white',
       padding: '8px',
       borderRadius: 'var(--radius-sm)',
       display: 'flex'
@@ -147,17 +164,17 @@ const InsightsPanel = () => {
           <h2 style={styles.title}>AI-Generated Insights</h2>
         </div>
         <p style={styles.subtitle}>
-          We analyzed your dataset for mathematical relationships, clusters, and irregularities. Here is what we found.
+          Powered by Gemini AI — specific, actionable analysis based on your dataset's actual columns and values.
         </p>
       </div>
 
       <div style={styles.grid}>
         {insights.map((insightText, idx) => {
           const typeInfo = determineInsightType(insightText);
-          
+
           return (
-            <div 
-              key={idx} 
+            <div
+              key={idx}
               style={styles.card}
               onMouseEnter={(e) => getCardHoverStyle(e, true)}
               onMouseLeave={(e) => getCardHoverStyle(e, false)}

@@ -5,10 +5,9 @@ import { AlertOctagon, RotateCcw } from 'lucide-react';
 
 const ErrorView = () => {
   const dispatch = useDispatch();
-  const { uploadError, summaryError, visualizationError, insightsError } = useSelector((state) => state.dataset);
+  const { uploadError, analysisError } = useSelector((state) => state.dataset);
   
-  // Find which error occurred
-  const errorMsg = uploadError || summaryError || visualizationError || insightsError || "An unknown error occurred.";
+  const errorMsg = uploadError || analysisError || "An unknown error occurred.";
 
   const handleRetry = () => {
     dispatch(resetState());

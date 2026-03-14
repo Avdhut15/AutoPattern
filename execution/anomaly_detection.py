@@ -1,41 +1,92 @@
 import pandas as pd
 import numpy as np
 from sklearn.ensemble import IsolationForest
+from sklearn.neighbors import LocalOutlierFactor
+from scipy import stats
 from typing import Dict, Any, List
 
+MAX_FIT_ROWS = 3000
+MAX_OUTPUT_POINTS = 2000
+
+def _sample_rows(X: np.ndarray, max_rows: int = MAX_FIT_ROWS):
+    if len(X) <= max_rows:
+        return X, list(range(len(X)))
+    rng = np.random.default_rng(42)
+    idx = sorted(rng.choice(len(X), max_rows, replace=False).tolist())
+    return X[idx], idx
+
+def _sample_output(labels: list, scores: list, max_pts: int = MAX_OUTPUT_POINTS):
+    if len(labels) <= max_pts:
+        return labels, scores
+    rng = np.random.default_rng(42)
+    idx = sorted(rng.choice(len(labels), max_pts, replace=False).tolist())
+    return [labels[i] for i in idx], [scores[i] for i in idx]
+
 def run_isolation_forest(df_scaled: pd.DataFrame, num_features: List[str], contamination: float = 0.1) -> Dict[str, Any]:
-    """
-    Runs Isolation Forest algorithm for anomaly detection.
-    """
     if not num_features or df_scaled[num_features].empty:
         return {"anomaly_scores": [], "anomaly_labels": [], "outliers_count": 0}
-        
     X = df_scaled[num_features].values
-    
-    if len(X) > 0:
-        # Create and fit the model
-        model = IsolationForest(contamination=contamination, random_state=42)
-        
-        # Predict: 1 for inliers, -1 for outliers
-        # Convert to: 0 for normal, 1 for anomaly
-        predictions = model.fit_predict(X)
-        anomaly_labels = [1 if p == -1 else 0 for p in predictions]
-        
-        # Anomaly scores: lower means more anomalous
-        scores = model.score_samples(X).tolist()
-        
-        return {
-            "anomaly_scores": scores,
-            "anomaly_labels": anomaly_labels,
-            "outliers_count": sum(anomaly_labels)
-        }
-        
-    return {"anomaly_scores": [], "anomaly_labels": [], "outliers_count": 0}
+    X_fit, _ = _sample_rows(X)
+    model = IsolationForest(contamination=contamination, random_state=42)
+    model.fit(X_fit)
+    predictions = model.predict(X)
+    anomaly_labels = [1 if p == -1 else 0 for p in predictions]
+    scores = model.score_samples(X).tolist()
+    sampled_labels, sampled_scores = _sample_output(anomaly_labels, scores)
+    return {
+        "anomaly_scores": sampled_scores,
+        "anomaly_labels": sampled_labels,
+        "outliers_count": int(sum(anomaly_labels)),
+    }
 
-def detect_anomalies(df_processed: pd.DataFrame, metadata: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Orchestrates the anomaly detection execution.
-    """
-    num_features = metadata.get('numerical_features', [])
-    
-    return run_isolation_forest(df_processed, num_features)
+def run_lof(df_scaled: pd.DataFrame, num_features: List[str], contamination: float = 0.1) -> Dict[str, Any]:
+    if not num_features or df_scaled[num_features].empty:
+        return {"lof_scores": [], "lof_labels": [], "lof_outliers_count": 0}
+    X = df_scaled[num_features].values
+    X_fit, _ = _sample_rows(X)
+    n_neighbors = min(20, len(X_fit) - 1)
+    if n_neighbors < 1:
+        return {"lof_scores": [], "lof_labels": [], "lof_outliers_count": 0}
+    lof = LocalOutlierFactor(n_neighbors=n_neighbors, contamination=contamination, novelty=True)
+    lof.fit(X_fit)
+    predictions = lof.predict(X)
+    lof_labels = [1 if p == -1 else 0 for p in predictions]
+    scores = lof.score_samples(X).tolist()
+    sampled_labels, sampled_scores = _sample_output(lof_labels, scores)
+    return {
+        "lof_scores": sampled_scores,
+        "lof_labels": sampled_labels,
+        "lof_outliers_count": int(sum(lof_labels)),
+    }
+
+def run_zscore(df_scaled: pd.DataFrame, num_features: List[str], threshold: float = 3.0) -> Dict[str, Any]:
+    if not num_features or df_scaled[num_features].empty:
+        return {"zscore_labels": [], "zscore_outliers_count": 0}
+    X = df_scaled[num_features].values
+    z_scores = np.abs(stats.zscore(X, nan_policy="omit"))
+    zscore_labels = [1 if np.any(row > threshold) else 0 for row in z_scores]
+    sampled_labels, _ = _sample_output(zscore_labels, zscore_labels)
+    return {
+        "zscore_labels": sampled_labels,
+        "zscore_outliers_count": int(sum(zscore_labels)),
+    }
+
+def detect_anomalies(df_processed: pd.DataFrame, metadata: Dict[str, Any], models: List[str] = None) -> Dict[str, Any]:
+    num_features = metadata.get("numerical_features", [])
+    if models is None:
+        models = ["anomaly_isolation_forest", "anomaly_zscore"]
+
+    result = {}
+    if "anomaly_isolation_forest" in models:
+        result.update(run_isolation_forest(df_processed, num_features))
+    if "anomaly_lof" in models:
+        result.update(run_lof(df_processed, num_features))
+    if "anomaly_zscore" in models:
+        result.update(run_zscore(df_processed, num_features))
+
+    # Ensure base keys always exist for backward compatibility
+    if "anomaly_labels" not in result:
+        result["anomaly_labels"] = []
+        result["anomaly_scores"] = []
+        result["outliers_count"] = 0
+    return result

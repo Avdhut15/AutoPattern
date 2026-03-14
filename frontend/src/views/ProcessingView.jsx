@@ -3,22 +3,20 @@ import { useSelector } from 'react-redux';
 import { Loader2, CheckCircle2 } from 'lucide-react';
 
 const ProcessingView = () => {
-  const { uploadLoading, summaryLoading, visualizationLoading, insightsLoading } = useSelector((state) => state.dataset);
+  const { uploadLoading, analysisLoading } = useSelector((state) => state.dataset);
   
   const [currentStep, setCurrentStep] = useState(0);
 
   useEffect(() => {
-    if (uploadLoading) setCurrentStep(1); // Uploading
-    else if (summaryLoading) setCurrentStep(2); // Analyzing basic stats
-    else if (visualizationLoading) setCurrentStep(3); // Detecting patterns
-    else if (insightsLoading) setCurrentStep(4); // Generating insights
-  }, [uploadLoading, summaryLoading, visualizationLoading, insightsLoading]);
+    if (uploadLoading) setCurrentStep(1);
+    else if (analysisLoading) setCurrentStep(2);
+    else setCurrentStep(3); // Waiting for data to arrive
+  }, [uploadLoading, analysisLoading]);
 
   const steps = [
     { id: 1, text: "Uploading dataset..." },
-    { id: 2, text: "Analyzing metadata and cleaning..." },
-    { id: 3, text: "Detecting patterns and anomalies..." },
-    { id: 4, text: "Generating intelligence insights..." }
+    { id: 2, text: "Running AI analysis (recommend → models → insights)..." },
+    { id: 3, text: "Preparing results..." }
   ];
 
   const styles = {
