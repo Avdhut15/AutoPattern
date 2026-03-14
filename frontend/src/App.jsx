@@ -1,12 +1,9 @@
 import React from 'react';
-import { BrowserRouter } from 'react-router-dom';
 import AppContent from './AppContent';
 
 function App() {
   return (
-    <BrowserRouter>
-      <AppContent />
-    </BrowserRouter>
+    <AppContent />
   );
 }
 
