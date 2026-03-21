@@ -6,6 +6,9 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 from typing import Dict, Any, List
 
+# Limit PyTorch threads to avoid contention during parallel execution
+torch.set_num_threads(2)
+
 MAX_TRAIN_ROWS = 3000
 MAX_OUTPUT_POINTS = 2000
 
@@ -25,7 +28,7 @@ class SimpleAutoencoder(nn.Module):
 def run_dl_anomaly_detection(
     df_scaled: pd.DataFrame,
     num_features: List[str],
-    epochs: int = 20,
+    epochs: int = 15,
     batch_size: int = 32,
     threshold_percentile: float = 90.0,
 ) -> Dict[str, Any]:
