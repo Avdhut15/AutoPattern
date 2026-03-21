@@ -2,6 +2,8 @@ import pandas as pd
 import numpy as np
 from sklearn.ensemble import IsolationForest
 from sklearn.neighbors import LocalOutlierFactor
+from sklearn.svm import OneClassSVM
+from sklearn.covariance import EllipticEnvelope
 from scipy import stats
 from typing import Dict, Any, List
 
@@ -27,7 +29,7 @@ def run_isolation_forest(df_scaled: pd.DataFrame, num_features: List[str], conta
         return {"anomaly_scores": [], "anomaly_labels": [], "outliers_count": 0}
     X = df_scaled[num_features].values
     X_fit, _ = _sample_rows(X)
-    model = IsolationForest(contamination=contamination, random_state=42)
+    model = IsolationForest(contamination=contamination, random_state=42, n_jobs=-1)
     model.fit(X_fit)
     predictions = model.predict(X)
     anomaly_labels = [1 if p == -1 else 0 for p in predictions]
@@ -71,6 +73,46 @@ def run_zscore(df_scaled: pd.DataFrame, num_features: List[str], threshold: floa
         "zscore_outliers_count": int(sum(zscore_labels)),
     }
 
+def run_one_class_svm(df_scaled: pd.DataFrame, num_features: List[str]) -> Dict[str, Any]:
+    """One-Class SVM — learns a tight boundary around normal data."""
+    if not num_features or df_scaled[num_features].empty:
+        return {"svm_labels": [], "svm_scores": [], "svm_outliers_count": 0}
+    X = df_scaled[num_features].values
+    X_fit, _ = _sample_rows(X, max_rows=2000)  # SVM scales poorly, tighter cap
+    svm = OneClassSVM(kernel="rbf", gamma="scale", nu=0.1)
+    svm.fit(X_fit)
+    predictions = svm.predict(X)
+    svm_labels = [1 if p == -1 else 0 for p in predictions]
+    scores = svm.score_samples(X).tolist()
+    sampled_labels, sampled_scores = _sample_output(svm_labels, scores)
+    return {
+        "svm_labels": sampled_labels,
+        "svm_scores": sampled_scores,
+        "svm_outliers_count": int(sum(svm_labels)),
+    }
+
+def run_elliptic_envelope(df_scaled: pd.DataFrame, num_features: List[str], contamination: float = 0.1) -> Dict[str, Any]:
+    """Elliptic Envelope — Mahalanobis distance-based anomaly detection."""
+    if not num_features or df_scaled[num_features].empty or len(df_scaled) < 10:
+        return {"envelope_labels": [], "envelope_scores": [], "envelope_outliers_count": 0}
+    X = df_scaled[num_features].values
+    X_fit, _ = _sample_rows(X)
+    try:
+        envelope = EllipticEnvelope(contamination=contamination, random_state=42, support_fraction=0.9)
+        envelope.fit(X_fit)
+        predictions = envelope.predict(X)
+        envelope_labels = [1 if p == -1 else 0 for p in predictions]
+        scores = envelope.score_samples(X).tolist()
+        sampled_labels, sampled_scores = _sample_output(envelope_labels, scores)
+        return {
+            "envelope_labels": sampled_labels,
+            "envelope_scores": sampled_scores,
+            "envelope_outliers_count": int(sum(envelope_labels)),
+        }
+    except Exception:
+        # EllipticEnvelope can fail on singular covariance matrices
+        return {"envelope_labels": [], "envelope_scores": [], "envelope_outliers_count": 0}
+
 def detect_anomalies(df_processed: pd.DataFrame, metadata: Dict[str, Any], models: List[str] = None) -> Dict[str, Any]:
     num_features = metadata.get("numerical_features", [])
     if models is None:
@@ -83,6 +125,10 @@ def detect_anomalies(df_processed: pd.DataFrame, metadata: Dict[str, Any], model
         result.update(run_lof(df_processed, num_features))
     if "anomaly_zscore" in models:
         result.update(run_zscore(df_processed, num_features))
+    if "anomaly_one_class_svm" in models:
+        result.update(run_one_class_svm(df_processed, num_features))
+    if "anomaly_elliptic_envelope" in models:
+        result.update(run_elliptic_envelope(df_processed, num_features))
 
     # Ensure base keys always exist for backward compatibility
     if "anomaly_labels" not in result:

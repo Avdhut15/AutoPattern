@@ -3,6 +3,7 @@ import numpy as np
 from sklearn.cluster import KMeans, DBSCAN, AgglomerativeClustering
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
+from sklearn.mixture import GaussianMixture
 from typing import Dict, Any, List
 
 MAX_OUTPUT_POINTS = 2000
@@ -27,10 +28,15 @@ def run_dbscan(df_scaled: pd.DataFrame, num_features: List[str]) -> Dict[str, An
     if not num_features or df_scaled[num_features].empty:
         return {"dbscan_labels": []}
     X = df_scaled[num_features].values
-    dbscan = DBSCAN(eps=0.5, min_samples=min(5, len(X)))
-    labels = dbscan.fit_predict(X).tolist()
+    # Cap for speed
+    cap = min(len(X), 3000)
+    rng = np.random.default_rng(42)
+    train_idx = sorted(rng.choice(len(X), cap, replace=False).tolist()) if len(X) > cap else list(range(len(X)))
+    X_cap = X[train_idx]
+    dbscan = DBSCAN(eps=0.5, min_samples=min(5, len(X_cap)))
+    labels = dbscan.fit_predict(X_cap).tolist()
     idx = _sample_indices(len(labels))
-    return {"dbscan_labels": [labels[i] for i in idx], "sample_indices": idx}
+    return {"dbscan_labels": [labels[i] for i in idx], "sample_indices": [train_idx[i] for i in idx]}
 
 def run_hierarchical(df_scaled: pd.DataFrame, num_features: List[str]) -> Dict[str, Any]:
     if not num_features or df_scaled[num_features].empty or len(df_scaled) < 2:
@@ -41,6 +47,22 @@ def run_hierarchical(df_scaled: pd.DataFrame, num_features: List[str]) -> Dict[s
     labels = hc.fit_predict(X).tolist()
     idx = _sample_indices(len(labels))
     return {"hierarchical_labels": [labels[i] for i in idx], "sample_indices": idx}
+
+def run_gmm(df_scaled: pd.DataFrame, num_features: List[str]) -> Dict[str, Any]:
+    """Gaussian Mixture Model — soft probabilistic clustering."""
+    if not num_features or df_scaled[num_features].empty or len(df_scaled) < 5:
+        return {"gmm_labels": [], "gmm_probabilities": []}
+    X = df_scaled[num_features].values
+    n_components = min(3, len(X))
+    gmm = GaussianMixture(n_components=n_components, random_state=42, max_iter=100)
+    labels = gmm.fit_predict(X).tolist()
+    probs = gmm.predict_proba(X).max(axis=1).tolist()
+    idx = _sample_indices(len(labels))
+    return {
+        "gmm_labels": [labels[i] for i in idx],
+        "gmm_probabilities": [round(probs[i], 4) for i in idx],
+        "sample_indices": idx,
+    }
 
 def calculate_correlation(df: pd.DataFrame, num_features: List[str]) -> Dict[str, Any]:
     if not num_features or len(num_features) < 2:
@@ -71,14 +93,38 @@ def run_tsne(df_scaled: pd.DataFrame, num_features: List[str]) -> Dict[str, Any]
     if not num_features or len(num_features) < 2 or len(df_scaled) < 10:
         return {"projections": []}
     X = df_scaled[num_features].values
-    # t-SNE is slow — cap to 2000 rows for training
     cap = min(len(X), 2000)
     rng = np.random.default_rng(42)
     train_idx = sorted(rng.choice(len(X), cap, replace=False).tolist()) if len(X) > cap else list(range(len(X)))
     X_cap = X[train_idx]
     perplexity = min(30, max(5, len(X_cap) // 10))
-    tsne = TSNE(n_components=2, random_state=42, perplexity=perplexity, n_iter=300)
+    tsne = TSNE(n_components=2, random_state=42, perplexity=perplexity, max_iter=300)
     proj = tsne.fit_transform(X_cap)
+    idx = _sample_indices(len(proj))
+    return {
+        "projections": [proj[i].tolist() for i in idx],
+        "sample_indices": [train_idx[i] for i in idx],
+    }
+
+def run_umap(df_scaled: pd.DataFrame, num_features: List[str]) -> Dict[str, Any]:
+    """UMAP — fast non-linear dimensionality reduction."""
+    if not num_features or len(num_features) < 2 or len(df_scaled) < 10:
+        return {"projections": []}
+    try:
+        import umap
+    except ImportError:
+        # Fallback: skip UMAP if not installed
+        return {"projections": [], "error": "umap-learn not installed"}
+    X = df_scaled[num_features].values
+    cap = min(len(X), 3000)
+    rng = np.random.default_rng(42)
+    train_idx = sorted(rng.choice(len(X), cap, replace=False).tolist()) if len(X) > cap else list(range(len(X)))
+    X_cap = X[train_idx]
+    n_neighbors = min(15, len(X_cap) - 1)
+    if n_neighbors < 2:
+        return {"projections": []}
+    reducer = umap.UMAP(n_components=2, n_neighbors=n_neighbors, random_state=42, n_epochs=200)
+    proj = reducer.fit_transform(X_cap)
     idx = _sample_indices(len(proj))
     return {
         "projections": [proj[i].tolist() for i in idx],
@@ -96,6 +142,10 @@ def detect_patterns(df_processed: pd.DataFrame, metadata: Dict[str, Any], models
         clustering.update(run_kmeans(df_processed, num_features))
     if "clustering_hierarchical" in models:
         clustering.update(run_hierarchical(df_processed, num_features))
+    if "clustering_dbscan" in models:
+        clustering.update(run_dbscan(df_processed, num_features))
+    if "clustering_gmm" in models:
+        clustering.update(run_gmm(df_processed, num_features))
     if clustering:
         result["clustering"] = clustering
 
@@ -107,5 +157,8 @@ def detect_patterns(df_processed: pd.DataFrame, metadata: Dict[str, Any], models
 
     if "tsne" in models:
         result["tsne"] = run_tsne(df_processed, num_features)
+
+    if "umap" in models:
+        result["umap"] = run_umap(df_processed, num_features)
 
     return result
