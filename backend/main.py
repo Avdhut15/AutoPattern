@@ -63,6 +63,8 @@ def read_root():
     return {"message": "Welcome to AutoPattern API v2.0"}
 
 
+import hashlib
+
 @app.post("/upload_dataset", response_model=UploadResponse)
 async def upload_dataset(file: UploadFile = File(...)):
     if not file.filename:
@@ -70,13 +72,19 @@ async def upload_dataset(file: UploadFile = File(...)):
     ext = os.path.splitext(file.filename)[1].lower()
     if ext not in [".csv", ".xlsx", ".xls", ".json"]:
         raise HTTPException(status_code=400, detail="Unsupported file format")
-    unique_filename = f"{uuid.uuid4()}{ext}"
-    file_path = os.path.join(TMP_DIR, unique_filename)
+    
     try:
-        def write_file():
-            with open(file_path, "wb") as buffer:
-                shutil.copyfileobj(file.file, buffer)
-        await asyncio.to_thread(write_file)
+        content = await file.read()
+        file_hash = hashlib.md5(content).hexdigest()
+        unique_filename = f"{file_hash}{ext}"
+        file_path = os.path.join(TMP_DIR, unique_filename)
+        
+        if not os.path.exists(file_path):
+            def write_file():
+                with open(file_path, "wb") as buffer:
+                    buffer.write(content)
+            await asyncio.to_thread(write_file)
+            
         return UploadResponse(filename=file.filename, message="File uploaded successfully", file_path=file_path, status="success")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
