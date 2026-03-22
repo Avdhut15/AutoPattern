@@ -87,7 +87,7 @@ export const useStore = create(
       },
     }),
     {
-      name: 'autopattern-storage',
+      name: 'autopattern-storage-v2',
     }
   )
 );

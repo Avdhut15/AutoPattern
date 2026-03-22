@@ -1,54 +1,70 @@
 import pandas as pd
 from typing import Dict, Any, List
 
-def generate_insights(df: pd.DataFrame, patterns: Dict[str, Any], anomalies: Dict[str, Any], dl_anomalies: Dict[str, Any]) -> List[str]:
+def generate_insights(context: Dict[str, Any]) -> List[str]:
     """
-    Generates human-readable insights based on the analysis results.
+    Generates intelligent, dataset-specific insights using a deterministic rule-based engine.
     """
     insights = []
     
-    # Basic data insights
-    insights.append(f"The dataset contains {len(df)} rows and {len(df.columns)} features.")
-    
-    # Correlation insights
-    if "correlation" in patterns and patterns["correlation"].get("matrix"):
-        matrix = patterns["correlation"]["matrix"]
-        features = patterns["correlation"]["features"]
+    problem_type = context.get("problem_type", "unknown")
+    models_used = context.get("models_used", [])
+    num_clusters = context.get("num_clusters", 0)
+    cluster_sizes = context.get("cluster_sizes", [])
+    correlation = context.get("correlation", {})
+    anomalies = context.get("anomalies", 0)
+    distribution = context.get("distribution", "unknown")
+    n_rows = context.get("n_rows", 0)
+    n_cols = context.get("n_cols", 0)
+
+    # 1. Dataset Overview
+    insights.append(f"The dataset contains {n_rows:,} rows and {n_cols} columns, classified as a {problem_type} problem.")
+
+    # 2. Correlation Insights
+    if correlation:
+        strong_pairs = []
+        for pair, val in correlation.items():
+            if abs(val) > 0.7:
+                strong_pairs.append((pair, val))
         
-        high_correlations = []
-        for i in range(len(features)):
-            for j in range(i+1, len(features)):
-                corr = matrix[i][j]
-                if abs(corr) > 0.7:
-                    high_correlations.append((features[i], features[j], corr))
-                    
-        for feat1, feat2, corr in high_correlations[:3]:
-            direction = "positively" if corr > 0 else "negatively"
-            insights.append(f"'{feat1}' strongly correlates {direction} with '{feat2}' (r={corr:.2f}).")
-            
-    # Clustering insights
-    if "clustering" in patterns and "kmeans_labels" in patterns["clustering"]:
-        labels = patterns["clustering"]["kmeans_labels"]
-        if labels:
-            n_clusters = len(set(labels))
-            insights.append(f"{n_clusters} distinct clusters were detected using KMeans.")
-            
-    # DBSCAN insights
-    if "clustering" in patterns and "dbscan_labels" in patterns["clustering"]:
-        labels = patterns["clustering"]["dbscan_labels"]
-        if labels:
-            n_clusters = len(set([l for l in labels if l != -1]))
-            noise = sum([1 for l in labels if l == -1])
-            insights.append(f"DBSCAN identified {n_clusters} dense clusters and {noise} noise points.")
-            
-    # Anomaly insights (Isolation Forest)
-    if "outliers_count" in anomalies:
-        count = anomalies["outliers_count"]
-        insights.append(f"Isolation Forest detected {count} statistical anomalies ({count/len(df)*100:.1f}% of data).")
-        
-    # Deep Learning Anomaly insights
-    if "outliers_count" in dl_anomalies:
-        count = dl_anomalies["outliers_count"]
-        insights.append(f"The Deep Learning Autoencoder flagged {count} data points with high reconstruction error.")
-        
+        if strong_pairs:
+            strong_pairs.sort(key=lambda x: abs(x[1]), reverse=True)
+            top_pair, top_val = strong_pairs[0]
+            direction = "positive" if top_val > 0 else "negative"
+            feats = top_pair.split("-")
+            if len(feats) == 2:
+                insights.append(f"There is a strong {direction} correlation ({top_val:.2f}) between {feats[0]} and {feats[1]}.")
+            else:
+                insights.append(f"Strong {direction} correlation detected: {top_pair} ({top_val:.2f}).")
+                
+            if len(strong_pairs) > 1:
+                insights.append(f"A total of {len(strong_pairs)} highly correlated feature pairs were found, suggesting potential redundancy.")
+
+    # 3. Clustering Insights
+    if num_clusters > 1:
+        insights.append(f"The dataset forms {num_clusters} distinct clusters, indicating natural groupings.")
+        if cluster_sizes:
+            largest = max(cluster_sizes)
+            smallest = min(cluster_sizes)
+            if largest > smallest * 5:
+                insights.append(f"The clusters are highly imbalanced, with the largest group containing {largest} points and the smallest containing {smallest} points.")
+            else:
+                insights.append(f"The clusters are relatively balanced in size.")
+
+    # 4. Anomaly Insights
+    if anomalies > 0:
+        pct = (anomalies / max(n_rows, 1)) * 100
+        insights.append(f"A total of {anomalies} anomalies ({pct:.1f}%) were detected, suggesting unusual data patterns or outliers.")
+    else:
+        if any(m.startswith("anomaly_") for m in models_used):
+            insights.append("No significant anomalies were detected within the normal boundaries of the data.")
+
+    # 5. Distribution Insights
+    if distribution and distribution != "unknown":
+        direction = distribution.replace("_", " ")
+        insights.append(f"Data distributions exhibit {direction} behavior, which may impact model performance if left unscaled.")
+
+    # 6. Model Selection Info
+    insights.append(f"Analysis was performed using the following selected models: {', '.join(models_used)}.")
+
     return insights

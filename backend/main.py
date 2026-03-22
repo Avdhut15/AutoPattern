@@ -20,8 +20,9 @@ from execution.preprocessing import get_summary_stats, load_and_clean_data, prep
 from execution.pattern_detection import detect_patterns
 from execution.anomaly_detection import detect_anomalies
 from execution.autoencoder_model import detect_dl_anomalies
-from execution.ai_advisor import get_ai_recommendation
-from execution.ai_insights import generate_ai_insights
+from execution.problem_detector import detect_problem_type
+from execution.model_selector import select_models
+from execution.insight_generator import generate_insights
 
 class InsightsResponse(BaseModel):
     filename: str
@@ -99,8 +100,15 @@ async def get_recommendation(file_path: str):
         return CACHE[file_path]["recommendation"]
     try:
         def _compute():
-            df, _, _ = _get_preprocessed(file_path)
-            return get_ai_recommendation(df)
+            df, _, metadata = _get_preprocessed(file_path)
+            problem = detect_problem_type(df, metadata)
+            selected = select_models(problem)
+            return {
+                "dataset_type": problem["problem_type"],
+                "recommended_models": selected,
+                "problem_metadata": problem,
+                "reasoning": f"Detected {problem['problem_type']} dataset with {problem['num_features']} features. Automatically selected {len(selected)} models."
+            }
         recommendation = await asyncio.to_thread(_compute)
         CACHE.setdefault(file_path, {})["recommendation"] = recommendation
         return recommendation
@@ -125,17 +133,24 @@ async def analyze(file_path: str):
             return _get_preprocessed(file_path)
         df, df_processed, metadata = await asyncio.to_thread(_preprocess)
 
-        # Step 2 — AI recommendation
+        # Step 2 — Problem detection and model selection
         def _recommend():
             if file_path in CACHE and "recommendation" in CACHE[file_path]:
                 return CACHE[file_path]["recommendation"]
-            rec = get_ai_recommendation(df)
+            problem = detect_problem_type(df, metadata)
+            selected = select_models(problem)
+            rec = {
+                "dataset_type": problem["problem_type"],
+                "recommended_models": selected,
+                "problem_metadata": problem,
+                "reasoning": f"Detected {problem['problem_type']} dataset with {problem['num_features']} features. Automatically selected {len(selected)} models."
+            }
             CACHE.setdefault(file_path, {})["recommendation"] = rec
             return rec
         recommendation = await asyncio.to_thread(_recommend)
 
         recommended_models = recommendation.get("recommended_models", [])
-        pattern_models = [m for m in recommended_models if not m.startswith("anomaly_")]
+        pattern_models = [m for m in recommended_models if not m.startswith("anomaly_") and not m.startswith("supervised_")]
         anomaly_models = [m for m in recommended_models if m.startswith("anomaly_") and m != "anomaly_autoencoder"]
         run_autoencoder = "anomaly_autoencoder" in recommended_models
 
@@ -168,7 +183,33 @@ async def analyze(file_path: str):
 
         # Step 5 — AI insights (uses results from step 4)
         def _insights():
-            return generate_ai_insights(df, patterns, anomalies, dl_anomalies, recommendation)
+            context = {
+                "problem_type": recommendation["dataset_type"],
+                "models_used": recommended_models,
+                "n_rows": recommendation["problem_metadata"]["n_rows"],
+                "n_cols": recommendation["problem_metadata"]["num_features"] + (1 if recommendation["problem_metadata"]["has_target"] else 0),
+                "distribution": "unknown",
+                "anomalies": sum([
+                    anomalies.get("outliers_count", 0),
+                    anomalies.get("lof_outliers_count", 0),
+                    dl_anomalies.get("outliers_count", 0)
+                ])
+            }
+            if "clustering" in patterns and "kmeans_labels" in patterns["clustering"]:
+                labels = patterns["clustering"]["kmeans_labels"]
+                context["num_clusters"] = len(set(labels))
+                context["cluster_sizes"] = [labels.count(i) for i in set(labels)]
+            
+            if "correlation" in patterns and patterns["correlation"].get("matrix"):
+                matrix = patterns["correlation"]["matrix"]
+                features = patterns["correlation"]["features"]
+                corrs = {}
+                for i in range(len(features)):
+                    for j in range(i+1, len(features)):
+                        corrs[f"{features[i]}-{features[j]}"] = matrix[i][j]
+                context["correlation"] = corrs
+
+            return generate_insights(context)
         insights = await asyncio.to_thread(_insights)
 
         result = {
@@ -223,8 +264,36 @@ async def get_insights(file_path: str):
             patterns = detect_patterns(df_processed, metadata)
             anomalies = detect_anomalies(df_processed, metadata)
             dl_anomalies = detect_dl_anomalies(df_processed, metadata)
-            recommendation = get_ai_recommendation(df)
-            return generate_ai_insights(df, patterns, anomalies, dl_anomalies, recommendation)
+            problem = detect_problem_type(df, metadata)
+            selected = select_models(problem)
+            
+            context = {
+                "problem_type": problem["problem_type"],
+                "models_used": selected,
+                "n_rows": problem["n_rows"],
+                "n_cols": problem["num_features"],
+                "distribution": "unknown",
+                "anomalies": sum([
+                    anomalies.get("outliers_count", 0),
+                    anomalies.get("lof_outliers_count", 0),
+                    dl_anomalies.get("outliers_count", 0)
+                ])
+            }
+            if "clustering" in patterns and "kmeans_labels" in patterns["clustering"]:
+                labels = patterns["clustering"]["kmeans_labels"]
+                context["num_clusters"] = len(set(labels))
+                context["cluster_sizes"] = [labels.count(i) for i in set(labels)]
+            
+            if "correlation" in patterns and patterns["correlation"].get("matrix"):
+                matrix = patterns["correlation"]["matrix"]
+                features = patterns["correlation"]["features"]
+                corrs = {}
+                for i in range(len(features)):
+                    for j in range(i+1, len(features)):
+                        corrs[f"{features[i]}-{features[j]}"] = matrix[i][j]
+                context["correlation"] = corrs
+
+            return generate_insights(context)
         insights = await asyncio.to_thread(_compute)
         CACHE.setdefault(file_path, {})["insights"] = insights
         return InsightsResponse(filename=os.path.basename(file_path), insights=insights)

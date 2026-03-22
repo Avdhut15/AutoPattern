@@ -24,6 +24,7 @@ def load_and_clean_data(file_path: str) -> pd.DataFrame:
     # For numeric columns, fill with mean
     num_cols = df.select_dtypes(include=[np.number]).columns
     df[num_cols] = df[num_cols].fillna(df[num_cols].mean())
+    df[num_cols] = df[num_cols].fillna(0)
     
     # For categorical columns, fill with mode
     cat_cols = df.select_dtypes(include=['object', 'category']).columns
