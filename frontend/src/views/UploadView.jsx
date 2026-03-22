@@ -1,10 +1,9 @@
 import React, { useCallback, useState } from 'react';
-import { useDispatch } from 'react-redux';
-import { uploadDataset } from '../store/datasetSlice';
+import { useStore } from '../store/useStore';
 import { UploadCloud, FileText } from 'lucide-react';
 
 const UploadView = () => {
-  const dispatch = useDispatch();
+  const uploadDataset = useStore((state) => state.uploadDataset);
   const [isDragging, setIsDragging] = useState(false);
 
   const handleDrag = useCallback((e) => {
@@ -48,7 +47,7 @@ const UploadView = () => {
       alert("File size exceeds 10MB limit.");
       return;
     }
-    dispatch(uploadDataset(file));
+    uploadDataset(file);
   };
 
   const styles = {
@@ -107,7 +106,7 @@ const UploadView = () => {
       gap: '0.5rem',
       fontSize: '0.85rem',
       color: 'var(--text-secondary)',
-      background: 'white',
+      background: 'var(--bg-card)',
       padding: '0.5rem 1rem',
       borderRadius: 'var(--radius-full)',
       boxShadow: '0 2px 5px rgba(0,0,0,0.02)'

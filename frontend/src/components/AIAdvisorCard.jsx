@@ -1,9 +1,9 @@
 import React from 'react';
-import { useSelector } from 'react-redux';
+import { useStore } from '../store/useStore';
 import { Brain, Check, X, Sparkles } from 'lucide-react';
 
 const AIAdvisorCard = () => {
-  const { recommendationData } = useSelector(state => state.dataset);
+  const recommendationData = useStore(state => state.recommendationData);
 
   if (!recommendationData) return null;
 
@@ -26,8 +26,8 @@ const AIAdvisorCard = () => {
 
   const styles = {
     card: {
-      background: 'linear-gradient(135deg, #EFF6FF 0%, #FAF5FF 100%)',
-      border: '1px solid var(--tint-blue-dark)',
+      background: 'linear-gradient(135deg, var(--bg-hover) 0%, var(--bg-card) 100%)',
+      border: '1px solid var(--border-light)',
       borderRadius: 'var(--radius-lg)',
       padding: '1.5rem',
       marginBottom: '1.5rem',
@@ -71,7 +71,7 @@ const AIAdvisorCard = () => {
       lineHeight: '1.6',
       marginBottom: '1.25rem',
       padding: '0.75rem 1rem',
-      backgroundColor: 'rgba(255,255,255,0.7)',
+      backgroundColor: 'rgba(0,0,0,0.2)',
       borderRadius: 'var(--radius-md)',
       borderLeft: '3px solid var(--brand-primary)',
     },
@@ -101,7 +101,7 @@ const AIAdvisorCard = () => {
       borderRadius: 'var(--radius-full)',
       fontSize: '0.8rem',
       fontWeight: '500',
-      backgroundColor: '#F1F5F9',
+      backgroundColor: 'rgba(0,0,0,0.2)',
       color: 'var(--text-muted)',
       border: '1px solid var(--border-light)',
       textDecoration: 'line-through',

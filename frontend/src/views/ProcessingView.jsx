@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { useSelector } from 'react-redux';
+import { useStore } from '../store/useStore';
 import { Loader2, CheckCircle2 } from 'lucide-react';
 
 const ProcessingView = () => {
-  const { uploadLoading, analysisLoading } = useSelector((state) => state.dataset);
+  const { uploadLoading, analysisLoading } = useStore();
   
   const [currentStep, setCurrentStep] = useState(0);
 

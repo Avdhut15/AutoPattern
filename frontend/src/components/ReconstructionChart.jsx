@@ -25,7 +25,7 @@ const ReconstructionChart = ({ reconstruction_errors = [], anomaly_labels = [] }
       const data = payload[0].payload;
       return (
         <div style={{
-          backgroundColor: 'white', padding: '12px',
+          backgroundColor: 'var(--bg-card)', padding: '12px',
           border: '1px solid var(--border-light)',
           borderRadius: 'var(--radius-md)',
           boxShadow: 'var(--shadow-md)',
