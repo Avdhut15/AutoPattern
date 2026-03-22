@@ -1,11 +1,11 @@
 import React, { useMemo } from 'react';
-import { useSelector } from 'react-redux';
+import { useStore } from '../store/useStore';
 import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { Network, GitMerge, Compass, Layers } from 'lucide-react';
 import AIAdvisorCard from '../components/AIAdvisorCard';
 
 const PatternsPanel = () => {
-  const { visualizationData, recommendationData } = useSelector(state => state.dataset);
+  const { visualizationData, recommendationData } = useStore();
 
   if (!visualizationData || !visualizationData.patterns) {
     return <div className="p-4" style={{ color: 'var(--text-secondary)' }}>No pattern data available yet.</div>;
@@ -70,7 +70,7 @@ const PatternsPanel = () => {
       gap: '1.5rem',
     },
     card: {
-      backgroundColor: 'white',
+      backgroundColor: 'var(--bg-card)',
       border: '1px solid var(--border-light)',
       borderRadius: 'var(--radius-lg)',
       padding: '1.5rem',
@@ -108,7 +108,7 @@ const PatternsPanel = () => {
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: getHeatmapColor(val),
-      border: '1px solid white',
+      border: '1px solid var(--bg-card)',
       fontSize: '0.65rem',
       color: Math.abs(val) > 0.5 ? 'white' : 'var(--text-secondary)',
       fontWeight: '500',
@@ -157,7 +157,7 @@ const PatternsPanel = () => {
   const CustomTooltip = ({ active, payload }) => {
     if (active && payload && payload.length) {
       return (
-        <div style={{ backgroundColor: 'white', padding: '10px', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-soft)', fontSize: '0.85rem' }}>
+        <div style={{ backgroundColor: 'var(--bg-card)', padding: '10px', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-soft)', fontSize: '0.85rem' }}>
           <p><strong>Cluster:</strong> {payload[0].payload.cluster}</p>
           <p><strong>X:</strong> {payload[0].value}</p>
           <p><strong>Y:</strong> {payload[1].value}</p>

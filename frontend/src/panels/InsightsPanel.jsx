@@ -1,9 +1,9 @@
 import React from 'react';
-import { useSelector } from 'react-redux';
+import { useStore } from '../store/useStore';
 import { Lightbulb, TrendingUp, Network, AlertTriangle, ShieldAlert, FileText, Zap, BarChart3 } from 'lucide-react';
 
 const InsightsPanel = () => {
-  const { insightsData } = useSelector(state => state.dataset);
+  const insightsData = useStore(state => state.insightsData);
 
   // insightsData is a flat array of strings from the unified /analyze endpoint
   if (!insightsData || !Array.isArray(insightsData) || insightsData.length === 0) {
@@ -107,7 +107,7 @@ const InsightsPanel = () => {
       gap: '1.5rem',
     },
     card: {
-      backgroundColor: 'white',
+      backgroundColor: 'var(--bg-card)',
       border: '1px solid var(--border-light)',
       borderRadius: 'var(--radius-lg)',
       padding: '1.5rem',

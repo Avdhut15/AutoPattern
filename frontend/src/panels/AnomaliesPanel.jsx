@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { useSelector } from 'react-redux';
+import { useStore } from '../store/useStore';
 import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { ShieldAlert, AlertTriangle, AlertOctagon, Activity, BarChart3, Search } from 'lucide-react';
 import ReconstructionChart from '../components/ReconstructionChart';
@@ -14,7 +14,7 @@ const TABS = [
 ];
 
 const AnomaliesPanel = () => {
-  const { visualizationData } = useSelector(state => state.dataset);
+  const visualizationData = useStore(state => state.visualizationData);
   const [activeTab, setActiveTab] = useState('overview');
 
   if (!visualizationData || !visualizationData.anomalies) {
@@ -98,7 +98,7 @@ const AnomaliesPanel = () => {
       boxShadow: 'var(--shadow-soft)',
     }),
     iconWrapper: (color) => ({
-      backgroundColor: 'white',
+      backgroundColor: 'var(--bg-card)',
       color: color,
       padding: '0.75rem',
       borderRadius: 'var(--radius-full)',
@@ -132,9 +132,9 @@ const AnomaliesPanel = () => {
       fontSize: '0.8rem',
       fontWeight: isActive ? '600' : '500',
       color: isActive ? 'var(--brand-primary)' : 'var(--text-secondary)',
-      backgroundColor: isActive ? 'white' : 'transparent',
+      backgroundColor: isActive ? 'var(--bg-card)' : 'transparent',
       boxShadow: isActive ? 'var(--shadow-soft)' : 'none',
-      border: 'none',
+      border: isActive ? '1px solid var(--border-light)' : '1px solid transparent',
       cursor: 'pointer',
       transition: 'all 0.2s',
       display: 'flex',
@@ -142,7 +142,7 @@ const AnomaliesPanel = () => {
       gap: '0.35rem',
     }),
     card: {
-      backgroundColor: 'white',
+      backgroundColor: 'var(--bg-card)',
       border: '1px solid var(--border-light)',
       borderRadius: 'var(--radius-lg)',
       padding: '1.5rem',
@@ -176,7 +176,7 @@ const AnomaliesPanel = () => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       return (
-        <div style={{ backgroundColor: 'white', padding: '12px', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-md)', fontSize: '0.85rem' }}>
+        <div style={{ backgroundColor: 'var(--bg-card)', padding: '12px', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-md)', fontSize: '0.85rem' }}>
           <div style={{ fontWeight: 'bold', color: data.isAnomaly ? 'var(--error)' : 'var(--brand-primary)', marginBottom: '4px' }}>
             {data.isAnomaly ? '🚨 Anomaly' : '✅ Normal'}
           </div>

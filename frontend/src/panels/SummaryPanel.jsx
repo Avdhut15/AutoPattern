@@ -1,9 +1,9 @@
 import React from 'react';
-import { useSelector } from 'react-redux';
+import { useStore } from '../store/useStore';
 import { Database, TrendingUp, AlertTriangle, Layers, Type, Percent } from 'lucide-react';
 
 const SummaryPanel = () => {
-  const { summaryData } = useSelector(state => state.dataset);
+  const summaryData = useStore(state => state.summaryData);
   
   if (!summaryData) return <div className="p-4">No data available</div>;
 
@@ -38,7 +38,7 @@ const SummaryPanel = () => {
       gap: '1.5rem',
     },
     statCard: {
-      backgroundColor: 'white',
+      backgroundColor: 'var(--bg-card)',
       border: '1px solid var(--border-light)',
       borderRadius: 'var(--radius-lg)',
       padding: '1.5rem',
