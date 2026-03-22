@@ -1,36 +1,36 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 :root {
-  /* Colors - Soft UI Light Theme */
-  --bg-global: #F4F7FC;
-  --bg-card: #FFFFFF;
-  --bg-hover: #F8FAFC;
+  /* Colors - OLED Dark Theme */
+  --bg-global: #0F172A;
+  --bg-card: #1E293B;
+  --bg-hover: #334155;
   
-  --text-primary: #0F172A;
-  --text-secondary: #64748B;
-  --text-muted: #94A3B8;
+  --text-primary: #F8FAFC;
+  --text-secondary: #94A3B8;
+  --text-muted: #64748B;
   
   --brand-primary: #3B82F6;
-  --brand-hover: #2563EB;
+  --brand-hover: #60A5FA;
   
-  /* Semantic Tints (Backgrounds for icons/stats) */
-  --tint-blue: #EFF6FF;
-  --tint-blue-dark: #BFDBFE;
+  /* Semantic Tints (Backgrounds for icons/stats in Dark Mode) */
+  --tint-blue: #1E3A8A;
+  --tint-blue-dark: #1D4ED8;
   
-  --tint-green: #F0FDF4;
-  --tint-green-dark: #BBF7D0;
+  --tint-green: #14532D;
+  --tint-green-dark: #15803D;
   
-  --tint-purple: #FAF5FF;
-  --tint-purple-dark: #E9D5FF;
+  --tint-purple: #4C1D95;
+  --tint-purple-dark: #6D28D9;
   
-  --tint-orange: #FFF7ED;
-  --tint-orange-dark: #FED7AA;
+  --tint-orange: #7C2D12;
+  --tint-orange-dark: #C2410C;
 
-  --tint-red: #FEF2F2;
-  --tint-red-dark: #FECACA;
+  --tint-red: #7F1D1D;
+  --tint-red-dark: #B91C1C;
 
-  --border-light: #E2E8F0;
-  --border-active: #CBD5E1;
+  --border-light: #334155;
+  --border-active: #475569;
   
   /* Status Colors */
   --error: #EF4444;
@@ -38,9 +38,9 @@
   --warning: #F59E0B;
   
   /* Shadows */
-  --shadow-soft: 0 4px 20px rgba(0, 0, 0, 0.03);
-  --shadow-hover: 0 10px 25px rgba(0, 0, 0, 0.06);
-  --shadow-inner: inset 0 2px 4px 0 rgba(0, 0, 0, 0.02);
+  --shadow-soft: 0 4px 20px rgba(0, 0, 0, 0.4);
+  --shadow-hover: 0 10px 25px rgba(0, 0, 0, 0.5);
+  --shadow-inner: inset 0 2px 4px 0 rgba(0, 0, 0, 0.2);
   
   /* Radii */
   --radius-sm: 8px;
