@@ -102,12 +102,13 @@ async def get_recommendation(file_path: str):
         def _compute():
             df, _, metadata = _get_preprocessed(file_path)
             problem = detect_problem_type(df, metadata)
-            selected = select_models(problem)
+            selected, llm_reasoning = select_models(problem)
+            default_reasoning = f"Detected {problem['problem_type']} dataset with {problem['num_features']} features. Automatically selected {len(selected)} models."
             return {
                 "dataset_type": problem["problem_type"],
                 "recommended_models": selected,
                 "problem_metadata": problem,
-                "reasoning": f"Detected {problem['problem_type']} dataset with {problem['num_features']} features. Automatically selected {len(selected)} models."
+                "reasoning": llm_reasoning if llm_reasoning else default_reasoning
             }
         recommendation = await asyncio.to_thread(_compute)
         CACHE.setdefault(file_path, {})["recommendation"] = recommendation
@@ -138,12 +139,13 @@ async def analyze(file_path: str):
             if file_path in CACHE and "recommendation" in CACHE[file_path]:
                 return CACHE[file_path]["recommendation"]
             problem = detect_problem_type(df, metadata)
-            selected = select_models(problem)
+            selected, llm_reasoning = select_models(problem)
+            default_reasoning = f"Detected {problem['problem_type']} dataset with {problem['num_features']} features. Automatically selected {len(selected)} models."
             rec = {
                 "dataset_type": problem["problem_type"],
                 "recommended_models": selected,
                 "problem_metadata": problem,
-                "reasoning": f"Detected {problem['problem_type']} dataset with {problem['num_features']} features. Automatically selected {len(selected)} models."
+                "reasoning": llm_reasoning if llm_reasoning else default_reasoning
             }
             CACHE.setdefault(file_path, {})["recommendation"] = rec
             return rec
@@ -265,7 +267,7 @@ async def get_insights(file_path: str):
             anomalies = detect_anomalies(df_processed, metadata)
             dl_anomalies = detect_dl_anomalies(df_processed, metadata)
             problem = detect_problem_type(df, metadata)
-            selected = select_models(problem)
+            selected, _ = select_models(problem)
             
             context = {
                 "problem_type": problem["problem_type"],
