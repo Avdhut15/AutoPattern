@@ -1,4 +1,4 @@
-"""Quick smoke test — verifies local advisor + all models work end-to-end."""
+"""Quick smoke test — verifies hybrid model selector + insights work end-to-end."""
 import sys, os
 sys.path.insert(0, os.path.dirname(__file__))
 
@@ -15,44 +15,85 @@ df = pd.DataFrame({
 })
 
 print("=" * 60)
-print("SMOKE TEST — Local AI Advisor + Models")
+print("SMOKE TEST — Hybrid Model Selector + Insights")
 print("=" * 60)
 
-# Test 1: AI Advisor
-from execution.ai_advisor import get_ai_recommendation
-rec = get_ai_recommendation(df)
-print(f"\n[1] AI Advisor:")
-print(f"    Dataset type: {rec['dataset_type']}")
-print(f"    Recommended: {rec['recommended_models']}")
-print(f"    Skipped: {list(rec['skip_reasons'].keys())}")
-print(f"    Reasoning: {rec['reasoning'][:120]}...")
+# Test 1: LLM availability
+from execution.local_llm import is_available
+llm_ok = is_available()
+print(f"\n[0] Ollama available: {llm_ok}")
+if not llm_ok:
+    print("    (LLM features will use rule-based fallback)")
 
-# Test 2: Preprocessing
+# Test 2: Problem detection
+from execution.problem_detector import detect_problem_type
 from execution.preprocessing import preprocess_features, get_summary_stats
 df_processed, metadata = preprocess_features(df.select_dtypes(include=[np.number]).copy())
-summary = get_summary_stats(df)
-print(f"\n[2] Preprocessing: {summary['num_rows']} rows, {summary['num_cols']} cols OK")
+problem = detect_problem_type(df, metadata)
+print(f"\n[1] Problem Detection:")
+print(f"    Type: {problem['problem_type']}, Features: {problem['num_features']}, Rows: {problem['n_rows']}")
 
-# Test 3: Pattern detection with new models
+# Test 3: Hybrid model selection
+from execution.model_selector import select_models
+selected, reasoning = select_models(problem)
+print(f"\n[2] Hybrid Model Selection:")
+print(f"    Selected ({len(selected)}): {selected}")
+if reasoning:
+    print(f"    LLM Reasoning: {reasoning[:150]}...")
+else:
+    print(f"    LLM Reasoning: (none — rule-based fallback)")
+
+# Test 4: Preprocessing
+summary = get_summary_stats(df)
+print(f"\n[3] Preprocessing: {summary['num_rows']} rows, {summary['num_cols']} cols OK")
+
+# Test 5: Pattern detection
 from execution.pattern_detection import detect_patterns
-patterns = detect_patterns(df_processed, metadata, rec['recommended_models'])
-print(f"\n[3] Pattern Detection keys: {list(patterns.keys())}")
+pattern_models = [m for m in selected if not m.startswith("anomaly_") and not m.startswith("supervised_")]
+patterns = detect_patterns(df_processed, metadata, pattern_models)
+print(f"\n[4] Pattern Detection keys: {list(patterns.keys())}")
 if 'clustering' in patterns:
     print(f"    Clustering keys: {list(patterns['clustering'].keys())}")
 
-# Test 4: Anomaly detection with new models
+# Test 6: Anomaly detection
 from execution.anomaly_detection import detect_anomalies
-anomaly_models = [m for m in rec['recommended_models'] if m.startswith('anomaly_') and m != 'anomaly_autoencoder']
+anomaly_models = [m for m in selected if m.startswith('anomaly_') and m != 'anomaly_autoencoder']
 anomalies = detect_anomalies(df_processed, metadata, anomaly_models)
-print(f"\n[4] Anomaly Detection keys: {list(anomalies.keys())}")
+print(f"\n[5] Anomaly Detection keys: {list(anomalies.keys())}")
 
-# Test 5: AI Insights (local)
-from execution.ai_insights import generate_ai_insights
+# Test 7: Insight generation (hybrid)
+from execution.insight_generator import generate_insights
 dl_anomalies = {"outliers_count": 0}
-insights = generate_ai_insights(df, patterns, anomalies, dl_anomalies, rec)
-print(f"\n[5] AI Insights ({len(insights)} generated):")
+context = {
+    "problem_type": problem["problem_type"],
+    "models_used": selected,
+    "n_rows": problem["n_rows"],
+    "n_cols": problem["num_features"],
+    "distribution": "unknown",
+    "anomalies": sum([
+        anomalies.get("outliers_count", 0),
+        anomalies.get("lof_outliers_count", 0),
+        dl_anomalies.get("outliers_count", 0)
+    ])
+}
+if "clustering" in patterns and "kmeans_labels" in patterns["clustering"]:
+    labels = patterns["clustering"]["kmeans_labels"]
+    context["num_clusters"] = len(set(labels))
+    context["cluster_sizes"] = [labels.count(i) for i in set(labels)]
+
+if "correlation" in patterns and patterns["correlation"].get("matrix"):
+    matrix = patterns["correlation"]["matrix"]
+    features = patterns["correlation"]["features"]
+    corrs = {}
+    for i in range(len(features)):
+        for j in range(i+1, len(features)):
+            corrs[f"{features[i]}-{features[j]}"] = matrix[i][j]
+    context["correlation"] = corrs
+
+insights = generate_insights(context)
+print(f"\n[6] Insights ({len(insights)} generated):")
 for i, insight in enumerate(insights, 1):
-    print(f"    {i}. {insight[:100]}{'...' if len(insight) > 100 else ''}")
+    print(f"    {i}. {insight[:120]}{'...' if len(insight) > 120 else ''}")
 
 print("\n" + "=" * 60)
 print("ALL TESTS PASSED")
