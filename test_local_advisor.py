@@ -63,18 +63,31 @@ print(f"\n[5] Anomaly Detection keys: {list(anomalies.keys())}")
 
 # Test 7: Insight generation (hybrid)
 from execution.insight_generator import generate_insights
-dl_anomalies = {"outliers_count": 0}
+
+label_lists = [
+    anomalies.get("anomaly_labels", []),
+    anomalies.get("lof_labels", []),
+    anomalies.get("zscore_labels", []),
+    anomalies.get("ocsvm_labels", []),
+    anomalies.get("elliptic_labels", []),
+]
+valid_lists = [l for l in label_lists if l and len(l) > 0]
+if valid_lists:
+    min_len = min(len(l) for l in valid_lists)
+    unique_anomalies = sum(1 for i in range(min_len) if any(l[i] == 1 for l in valid_lists))
+    consensus_anomalies = sum(1 for i in range(min_len) if sum(l[i] == 1 for l in valid_lists) >= 2)
+else:
+    unique_anomalies = 0
+    consensus_anomalies = 0
+
 context = {
     "problem_type": problem["problem_type"],
     "models_used": selected,
     "n_rows": problem["n_rows"],
     "n_cols": problem["num_features"],
     "distribution": "unknown",
-    "anomalies": sum([
-        anomalies.get("outliers_count", 0),
-        anomalies.get("lof_outliers_count", 0),
-        dl_anomalies.get("outliers_count", 0)
-    ])
+    "anomalies": unique_anomalies,
+    "consensus_anomalies": consensus_anomalies
 }
 if "clustering" in patterns and "kmeans_labels" in patterns["clustering"]:
     labels = patterns["clustering"]["kmeans_labels"]

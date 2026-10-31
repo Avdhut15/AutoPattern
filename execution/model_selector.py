@@ -26,18 +26,19 @@ Rules:
 Valid model names:
 clustering_kmeans, clustering_dbscan, clustering_gmm, clustering_hierarchical,
 correlation, pca, tsne, umap,
-anomaly_isolation_forest, anomaly_lof, anomaly_autoencoder"""
+anomaly_isolation_forest, anomaly_lof, anomaly_zscore, anomaly_one_class_svm, anomaly_elliptic_envelope, anomaly_autoencoder"""
 
 
 def _rule_based_selection(problem_metadata: Dict[str, Any]) -> List[str]:
     """
-    Original rule-based model selection logic (unchanged).
+    Original rule-based model selection logic.
     Returns candidate models based on dataset properties.
     """
     selected_models = []
 
     problem_type = problem_metadata.get("problem_type", "unsupervised")
     n_rows = problem_metadata.get("n_rows", 0)
+    num_features = problem_metadata.get("num_features", 0)
 
     # IF unsupervised: KMeans, DBSCAN, Gaussian Mixture Model
     if problem_type == "unsupervised":
@@ -59,14 +60,18 @@ def _rule_based_selection(problem_metadata: Dict[str, Any]) -> List[str]:
     # IF anomaly detection needed (numerical-heavy data)
     dominant_type = problem_metadata.get("dominant_type", "numerical")
     if dominant_type == "numerical":
-        selected_models.extend(["anomaly_isolation_forest", "anomaly_lof"])
-        if problem_metadata.get("num_features", 0) >= 3 and n_rows >= 100:
+        selected_models.extend(["anomaly_isolation_forest", "anomaly_lof", "anomaly_zscore"])
+        if num_features >= 2:
+            selected_models.append("anomaly_one_class_svm")
+        if n_rows > num_features and num_features >= 2:
+            selected_models.append("anomaly_elliptic_envelope")
+        if num_features >= 3 and n_rows >= 100:
             selected_models.append("anomaly_autoencoder")
 
     # IF high dimensional: apply dimensionality reduction
     if problem_metadata.get("high_dimensional", False):
         selected_models.extend(["pca", "tsne", "umap"])
-    elif problem_metadata.get("num_features", 0) >= 3:
+    elif num_features >= 3:
         selected_models.extend(["pca", "tsne"])
 
     # Filter duplicates

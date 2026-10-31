@@ -77,7 +77,11 @@ def _rule_based_insights(context: Dict[str, Any]) -> List[str]:
     # 4. Anomaly Insights
     if anomalies > 0:
         pct = (anomalies / max(n_rows, 1)) * 100
-        insights.append(f"A total of {anomalies} anomalies ({pct:.1f}%) were detected, suggesting unusual data patterns or outliers.")
+        consensus = context.get("consensus_anomalies", 0)
+        if consensus > 0 and consensus != anomalies:
+            insights.append(f"A total of {anomalies} unique anomalies ({pct:.1f}%) were detected across models, with {consensus} confirmed by multiple algorithms.")
+        else:
+            insights.append(f"A total of {anomalies} unique anomalies ({pct:.1f}%) were detected across models, suggesting unusual data patterns or outliers.")
     else:
         if any(m.startswith("anomaly_") for m in models_used):
             insights.append("No significant anomalies were detected within the normal boundaries of the data.")

@@ -25,9 +25,21 @@ class PatternAnalysisResponse(BaseModel):
 
 class AnomalyDetectionResponse(BaseModel):
     filename: str
-    anomaly_scores: List[float]
-    anomaly_labels: List[int]
-    outliers_count: int
+    anomaly_scores: List[float] = []
+    anomaly_labels: List[int] = []
+    outliers_count: int = 0
+    lof_scores: Optional[List[float]] = []
+    lof_labels: Optional[List[int]] = []
+    lof_outliers_count: Optional[int] = 0
+    zscore_scores: Optional[List[float]] = []
+    zscore_labels: Optional[List[int]] = []
+    zscore_outliers_count: Optional[int] = 0
+    ocsvm_scores: Optional[List[float]] = []
+    ocsvm_labels: Optional[List[int]] = []
+    ocsvm_outliers_count: Optional[int] = 0
+    elliptic_scores: Optional[List[float]] = []
+    elliptic_labels: Optional[List[int]] = []
+    elliptic_outliers_count: Optional[int] = 0
 
 class DLAnomalyDetectionResponse(BaseModel):
     filename: str

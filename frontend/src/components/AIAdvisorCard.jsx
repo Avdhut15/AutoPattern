@@ -12,12 +12,17 @@ const AIAdvisorCard = () => {
   const modelLabels = {
     clustering_kmeans: 'KMeans Clustering',
     clustering_hierarchical: 'Hierarchical Clustering',
+    clustering_dbscan: 'DBSCAN',
+    clustering_gmm: 'Gaussian Mixture Model',
     pca: 'PCA',
     tsne: 't-SNE',
+    umap: 'UMAP',
     correlation: 'Correlation Matrix',
     anomaly_isolation_forest: 'Isolation Forest',
     anomaly_lof: 'Local Outlier Factor',
     anomaly_zscore: 'Z-Score Detection',
+    anomaly_one_class_svm: 'One-Class SVM',
+    anomaly_elliptic_envelope: 'Elliptic Envelope',
     anomaly_autoencoder: 'Deep Learning Autoencoder',
   };
 

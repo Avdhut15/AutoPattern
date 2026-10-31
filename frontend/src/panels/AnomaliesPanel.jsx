@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useStore } from '../store/useStore';
 import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { ShieldAlert, AlertTriangle, AlertOctagon, Activity, BarChart3, Search } from 'lucide-react';
+import { ShieldAlert, AlertTriangle, AlertOctagon, Activity, BarChart3, Search, Crosshair, Target } from 'lucide-react';
 import ReconstructionChart from '../components/ReconstructionChart';
 import { DynamicBarChart } from '../components/DynamicChart';
 
@@ -10,6 +10,8 @@ const TABS = [
   { id: 'isolation_forest', label: 'Isolation Forest', icon: AlertTriangle },
   { id: 'lof', label: 'LOF', icon: Search },
   { id: 'zscore', label: 'Z-Score', icon: AlertOctagon },
+  { id: 'one_class_svm', label: 'One-Class SVM', icon: Crosshair },
+  { id: 'elliptic_envelope', label: 'Elliptic Envelope', icon: Target },
   { id: 'autoencoder', label: 'Autoencoder', icon: Activity },
 ];
 
@@ -28,7 +30,31 @@ const AnomaliesPanel = () => {
   const hasIF = anomalies?.anomaly_labels?.length > 0;
   const hasLOF = anomalies?.lof_labels?.length > 0;
   const hasZScore = anomalies?.zscore_labels?.length > 0;
+  const hasOCSVM = anomalies?.ocsvm_labels?.length > 0;
+  const hasElliptic = anomalies?.elliptic_labels?.length > 0;
   const hasAE = dl_anomalies?.latent_vectors?.length > 0;
+
+  // Compute unique de-duplicated anomalies count
+  const uniqueCount = useMemo(() => {
+    if (anomalies?.unique_outliers_count !== undefined) {
+      return anomalies.unique_outliers_count;
+    }
+    const lists = [
+      anomalies?.anomaly_labels,
+      anomalies?.lof_labels,
+      anomalies?.zscore_labels,
+      anomalies?.ocsvm_labels,
+      anomalies?.elliptic_labels,
+      dl_anomalies?.anomaly_labels,
+    ].filter(Boolean);
+    if (!lists.length) return 0;
+    const minLen = Math.min(...lists.map(l => l.length));
+    let count = 0;
+    for (let i = 0; i < minLen; i++) {
+      if (lists.some(l => l[i] === 1)) count++;
+    }
+    return count;
+  }, [anomalies, dl_anomalies]);
 
   // Isolation Forest scatter data
   const ifData = useMemo(() => {
@@ -38,6 +64,50 @@ const AnomaliesPanel = () => {
       y: Number(proj[1].toFixed(2)),
       isAnomaly: anomalies.anomaly_labels[idx] === 1,
       score: anomalies.anomaly_scores?.[idx]
+    }));
+  }, [pca, anomalies]);
+
+  // LOF scatter data (reuse PCA projections)
+  const lofData = useMemo(() => {
+    if (!pca?.projections || !anomalies?.lof_labels) return [];
+    return pca.projections.map((proj, idx) => ({
+      x: Number(proj[0].toFixed(2)),
+      y: Number(proj[1].toFixed(2)),
+      isAnomaly: anomalies.lof_labels[idx] === 1,
+      score: anomalies.lof_scores?.[idx]
+    }));
+  }, [pca, anomalies]);
+
+  // Z-Score scatter data (reuse PCA projections)
+  const zscoreData = useMemo(() => {
+    if (!pca?.projections || !anomalies?.zscore_labels) return [];
+    return pca.projections.map((proj, idx) => ({
+      x: Number(proj[0].toFixed(2)),
+      y: Number(proj[1].toFixed(2)),
+      isAnomaly: anomalies.zscore_labels[idx] === 1,
+      score: anomalies.zscore_scores?.[idx]
+    }));
+  }, [pca, anomalies]);
+
+  // One-Class SVM scatter data
+  const ocsvmData = useMemo(() => {
+    if (!pca?.projections || !anomalies?.ocsvm_labels) return [];
+    return pca.projections.map((proj, idx) => ({
+      x: Number(proj[0].toFixed(2)),
+      y: Number(proj[1].toFixed(2)),
+      isAnomaly: anomalies.ocsvm_labels[idx] === 1,
+      score: anomalies.ocsvm_scores?.[idx]
+    }));
+  }, [pca, anomalies]);
+
+  // Elliptic Envelope scatter data
+  const ellipticData = useMemo(() => {
+    if (!pca?.projections || !anomalies?.elliptic_labels) return [];
+    return pca.projections.map((proj, idx) => ({
+      x: Number(proj[0].toFixed(2)),
+      y: Number(proj[1].toFixed(2)),
+      isAnomaly: anomalies.elliptic_labels[idx] === 1,
+      score: anomalies.elliptic_scores?.[idx]
     }));
   }, [pca, anomalies]);
 
@@ -58,20 +128,11 @@ const AnomaliesPanel = () => {
     if (hasIF) items.push({ name: 'Isolation Forest', value: anomalies.outliers_count || 0, color: '#f59e0b' });
     if (hasLOF) items.push({ name: 'LOF', value: anomalies.lof_outliers_count || 0, color: '#06b6d4' });
     if (hasZScore) items.push({ name: 'Z-Score', value: anomalies.zscore_outliers_count || 0, color: '#9333ea' });
+    if (hasOCSVM) items.push({ name: 'One-Class SVM', value: anomalies.ocsvm_outliers_count || 0, color: '#10b981' });
+    if (hasElliptic) items.push({ name: 'Elliptic Envelope', value: anomalies.elliptic_outliers_count || 0, color: '#6366f1' });
     if (hasAE) items.push({ name: 'Autoencoder', value: dl_anomalies.outliers_count || 0, color: '#ef4444' });
     return items;
-  }, [anomalies, dl_anomalies, hasIF, hasLOF, hasZScore, hasAE]);
-
-  // LOF scatter data (reuse PCA projections)
-  const lofData = useMemo(() => {
-    if (!pca?.projections || !anomalies?.lof_labels) return [];
-    return pca.projections.map((proj, idx) => ({
-      x: Number(proj[0].toFixed(2)),
-      y: Number(proj[1].toFixed(2)),
-      isAnomaly: anomalies.lof_labels[idx] === 1,
-      score: anomalies.lof_scores?.[idx]
-    }));
-  }, [pca, anomalies]);
+  }, [anomalies, dl_anomalies, hasIF, hasLOF, hasZScore, hasOCSVM, hasElliptic, hasAE]);
 
   const styles = {
     container: {
@@ -83,7 +144,7 @@ const AnomaliesPanel = () => {
     },
     summaryGrid: {
       display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
       gap: '1rem',
       marginBottom: '0.5rem',
     },
@@ -215,6 +276,8 @@ const AnomaliesPanel = () => {
     if (tab.id === 'isolation_forest') return hasIF;
     if (tab.id === 'lof') return hasLOF;
     if (tab.id === 'zscore') return hasZScore;
+    if (tab.id === 'one_class_svm') return hasOCSVM;
+    if (tab.id === 'elliptic_envelope') return hasElliptic;
     if (tab.id === 'autoencoder') return hasAE;
     return false;
   });
@@ -271,16 +334,43 @@ const AnomaliesPanel = () => {
               <AlertOctagon size={20} color="#9333ea" /> Z-Score Outlier Detection
             </div>
             <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-              Points where any feature value exceeds 3 standard deviations from the mean.
+              Points where any feature value exceeds 3 standard deviations (±3σ) from the mean.
             </p>
-            <div style={{ padding: '1.5rem', backgroundColor: 'var(--tint-purple)', borderRadius: 'var(--radius-md)', marginTop: '1rem' }}>
-              <div style={{ fontSize: '2rem', fontWeight: '700', color: '#9333ea' }}>
+            <div style={{ padding: '1.25rem', backgroundColor: 'var(--tint-purple)', borderRadius: 'var(--radius-md)', marginTop: '0.75rem', marginBottom: '1rem' }}>
+              <div style={{ fontSize: '1.75rem', fontWeight: '700', color: '#9333ea' }}>
                 {anomalies.zscore_outliers_count || 0}
               </div>
-              <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
                 data points exceed the ±3σ threshold in at least one feature
               </div>
             </div>
+            {renderScatterChart(zscoreData, 'Z-Score Anomalies', 'var(--brand-primary)', '#9333ea')}
+          </div>
+        );
+
+      case 'one_class_svm':
+        return (
+          <div style={styles.card}>
+            <div style={styles.cardHeader}>
+              <Crosshair size={20} color="#10b981" /> One-Class SVM — PCA Projection
+            </div>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+              Non-linear kernel Support Vector Machine learns an RBF decision boundary around normal data.
+            </p>
+            {renderScatterChart(ocsvmData, 'One-Class SVM Anomalies', 'var(--brand-primary)', '#10b981')}
+          </div>
+        );
+
+      case 'elliptic_envelope':
+        return (
+          <div style={styles.card}>
+            <div style={styles.cardHeader}>
+              <Target size={20} color="#6366f1" /> Elliptic Envelope — PCA Projection
+            </div>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+              Robust covariance estimation (FastMCD) fits an elliptical boundary to isolate outliers.
+            </p>
+            {renderScatterChart(ellipticData, 'Elliptic Envelope Anomalies', 'var(--brand-primary)', '#6366f1')}
           </div>
         );
 
@@ -323,6 +413,16 @@ const AnomaliesPanel = () => {
 
       {/* Summary Cards */}
       <div style={styles.summaryGrid}>
+        <div style={styles.statCard('var(--brand-primary)', 'var(--tint-blue)')}>
+          <div style={styles.iconWrapper('var(--brand-primary)')}>
+            <ShieldAlert size={22} />
+          </div>
+          <div>
+            <div style={styles.statLabel}>Unique Anomalies</div>
+            <div style={styles.statValue('var(--brand-primary)')}>{uniqueCount} <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>pts</span></div>
+          </div>
+        </div>
+
         {hasIF && (
           <div style={styles.statCard('var(--warning)', 'var(--tint-orange)')}>
             <div style={styles.iconWrapper('var(--warning)')}>
@@ -353,6 +453,28 @@ const AnomaliesPanel = () => {
             <div>
               <div style={styles.statLabel}>Z-Score</div>
               <div style={styles.statValue('#9333ea')}>{anomalies.zscore_outliers_count} <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>pts</span></div>
+            </div>
+          </div>
+        )}
+        {hasOCSVM && (
+          <div style={styles.statCard('#10b981', '#ECFDF5')}>
+            <div style={styles.iconWrapper('#10b981')}>
+              <Crosshair size={22} />
+            </div>
+            <div>
+              <div style={styles.statLabel}>One-Class SVM</div>
+              <div style={styles.statValue('#10b981')}>{anomalies.ocsvm_outliers_count} <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>pts</span></div>
+            </div>
+          </div>
+        )}
+        {hasElliptic && (
+          <div style={styles.statCard('#6366f1', '#EEF2FF')}>
+            <div style={styles.iconWrapper('#6366f1')}>
+              <Target size={22} />
+            </div>
+            <div>
+              <div style={styles.statLabel}>Elliptic Env</div>
+              <div style={styles.statValue('#6366f1')}>{anomalies.elliptic_outliers_count} <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>pts</span></div>
             </div>
           </div>
         )}

@@ -14,7 +14,7 @@ load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
 
 from backend.models import UploadResponse, DatasetSummaryResponse, PatternAnalysisResponse, AnomalyDetectionResponse, DLAnomalyDetectionResponse
 from pydantic import BaseModel
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from backend.utils import load_dataset
 from execution.preprocessing import get_summary_stats, load_and_clean_data, preprocess_features
 from execution.pattern_detection import detect_patterns
@@ -59,6 +59,28 @@ def _get_preprocessed(file_path: str):
     return df, df_processed, metadata
 
 
+def _calculate_unique_anomalies(anomalies: Dict[str, Any], dl_anomalies: Dict[str, Any]) -> Tuple[int, int]:
+    """
+    Computes de-duplicated unique anomaly count and consensus anomaly count across all models.
+    Prevents double-counting the same data point across multiple detectors.
+    """
+    label_lists = [
+        anomalies.get("anomaly_labels", []),
+        anomalies.get("lof_labels", []),
+        anomalies.get("zscore_labels", []),
+        anomalies.get("ocsvm_labels", []),
+        anomalies.get("elliptic_labels", []),
+        dl_anomalies.get("anomaly_labels", [])
+    ]
+    valid_lists = [l for l in label_lists if l and len(l) > 0]
+    if not valid_lists:
+        return 0, 0
+    min_len = min(len(l) for l in valid_lists)
+    unique_count = sum(1 for i in range(min_len) if any(l[i] == 1 for l in valid_lists))
+    consensus_count = sum(1 for i in range(min_len) if sum(l[i] == 1 for l in valid_lists) >= 2)
+    return unique_count, consensus_count
+
+
 @app.get("/")
 def read_root():
     return {"message": "Welcome to AutoPattern API v2.0"}
@@ -98,6 +120,7 @@ async def get_recommendation(file_path: str):
         raise HTTPException(status_code=404, detail="File not found")
     if file_path in CACHE and "recommendation" in CACHE[file_path]:
         return CACHE[file_path]["recommendation"]
+
     try:
         def _compute():
             df, _, metadata = _get_preprocessed(file_path)
@@ -183,6 +206,10 @@ async def analyze(file_path: str):
             _run_autoencoder(),
         )
 
+        unique_anomalies, consensus_anomalies = _calculate_unique_anomalies(anomalies, dl_anomalies)
+        anomalies["unique_outliers_count"] = unique_anomalies
+        anomalies["consensus_outliers_count"] = consensus_anomalies
+
         # Step 5 — AI insights (uses results from step 4)
         def _insights():
             context = {
@@ -191,11 +218,8 @@ async def analyze(file_path: str):
                 "n_rows": recommendation["problem_metadata"]["n_rows"],
                 "n_cols": recommendation["problem_metadata"]["num_features"] + (1 if recommendation["problem_metadata"]["has_target"] else 0),
                 "distribution": "unknown",
-                "anomalies": sum([
-                    anomalies.get("outliers_count", 0),
-                    anomalies.get("lof_outliers_count", 0),
-                    dl_anomalies.get("outliers_count", 0)
-                ])
+                "anomalies": unique_anomalies,
+                "consensus_anomalies": consensus_anomalies,
             }
             if "clustering" in patterns and "kmeans_labels" in patterns["clustering"]:
                 labels = patterns["clustering"]["kmeans_labels"]
@@ -254,6 +278,59 @@ async def get_dataset_summary(file_path: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/pattern_analysis", response_model=PatternAnalysisResponse)
+async def get_pattern_analysis(file_path: str):
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File not found")
+    try:
+        def _compute():
+            _, df_processed, metadata = _get_preprocessed(file_path)
+            patterns = detect_patterns(df_processed, metadata)
+            return PatternAnalysisResponse(
+                filename=os.path.basename(file_path),
+                clustering=patterns.get("clustering", {}),
+                correlation=patterns.get("correlation", {}),
+                pca=patterns.get("pca", {})
+            )
+        return await asyncio.to_thread(_compute)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/anomaly_detection", response_model=AnomalyDetectionResponse)
+async def get_anomaly_detection(file_path: str):
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File not found")
+    try:
+        def _compute():
+            _, df_processed, metadata = _get_preprocessed(file_path)
+            anomalies = detect_anomalies(df_processed, metadata)
+            return AnomalyDetectionResponse(
+                filename=os.path.basename(file_path),
+                **anomalies
+            )
+        return await asyncio.to_thread(_compute)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/dl_anomaly_detection", response_model=DLAnomalyDetectionResponse)
+async def get_dl_anomaly_detection(file_path: str):
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File not found")
+    try:
+        def _compute():
+            _, df_processed, metadata = _get_preprocessed(file_path)
+            dl_anomalies = detect_dl_anomalies(df_processed, metadata)
+            return DLAnomalyDetectionResponse(
+                filename=os.path.basename(file_path),
+                **dl_anomalies
+            )
+        return await asyncio.to_thread(_compute)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/insights", response_model=InsightsResponse)
 async def get_insights(file_path: str):
     if not os.path.exists(file_path):
@@ -269,17 +346,16 @@ async def get_insights(file_path: str):
             problem = detect_problem_type(df, metadata)
             selected, _ = select_models(problem)
             
+            unique_anomalies, consensus_anomalies = _calculate_unique_anomalies(anomalies, dl_anomalies)
+
             context = {
                 "problem_type": problem["problem_type"],
                 "models_used": selected,
                 "n_rows": problem["n_rows"],
                 "n_cols": problem["num_features"],
                 "distribution": "unknown",
-                "anomalies": sum([
-                    anomalies.get("outliers_count", 0),
-                    anomalies.get("lof_outliers_count", 0),
-                    dl_anomalies.get("outliers_count", 0)
-                ])
+                "anomalies": unique_anomalies,
+                "consensus_anomalies": consensus_anomalies,
             }
             if "clustering" in patterns and "kmeans_labels" in patterns["clustering"]:
                 labels = patterns["clustering"]["kmeans_labels"]
