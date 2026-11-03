@@ -2,6 +2,18 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import DataService from '../services/api';
 
+const parseErrorMessage = (err, defaultMsg) => {
+  const detail = err?.response?.data?.detail;
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail)) {
+    return detail.map((d) => d.msg || JSON.stringify(d)).join(', ');
+  }
+  if (detail && typeof detail === 'object') {
+    return detail.message || JSON.stringify(detail);
+  }
+  return err?.message || defaultMsg;
+};
+
 export const useStore = create(
   persist(
     (set, get) => ({
@@ -19,7 +31,7 @@ export const useStore = create(
       recommendationData: null,
 
       uploadDataset: async (file) => {
-        set({ uploadLoading: true, uploadError: null });
+        set({ uploadLoading: true, uploadError: null, analysisError: null });
         try {
           const data = await DataService.uploadDataset(file);
           set({
@@ -32,12 +44,13 @@ export const useStore = create(
             visualizationData: null,
             insightsData: null,
             recommendationData: null,
+            uploadError: null,
             analysisError: null,
           });
         } catch (err) {
           set({
             uploadLoading: false,
-            uploadError: err.response?.data?.detail || 'Upload failed',
+            uploadError: parseErrorMessage(err, 'Upload failed. Please check the file format.'),
           });
         }
       },
@@ -65,7 +78,7 @@ export const useStore = create(
         } catch (err) {
           set({
             analysisLoading: false,
-            analysisError: err.response?.data?.detail || 'Analysis failed',
+            analysisError: parseErrorMessage(err, 'Analysis failed.'),
           });
         }
       },

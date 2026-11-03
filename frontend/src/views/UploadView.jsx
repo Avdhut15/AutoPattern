@@ -42,6 +42,17 @@ const UploadView = () => {
 
   const handleFiles = (files) => {
     const file = files[0];
+    if (!file) return;
+
+    // Check supported file extension
+    const allowedExtensions = ['.csv', '.xlsx', '.xls', '.json'];
+    const parts = file.name.split('.');
+    const ext = parts.length > 1 ? '.' + parts.pop().toLowerCase() : '';
+    if (!allowedExtensions.includes(ext)) {
+      alert(`Unsupported file format "${ext}". Please upload a CSV, XLSX, XLS, or JSON dataset.`);
+      return;
+    }
+
     // Check file size limit (10MB)
     if (file.size > 10 * 1024 * 1024) {
       alert("File size exceeds 10MB limit.");

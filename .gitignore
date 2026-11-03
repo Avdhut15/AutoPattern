@@ -47,3 +47,7 @@ dist/
 # OS
 .DS_Store
 Thumbs.db
+
+
+# Interview preparation files
+AUTOPATTERN_INTERVIEW_DOSSIER.md

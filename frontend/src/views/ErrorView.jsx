@@ -1,16 +1,17 @@
 import React from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { resetState } from '../store/datasetSlice';
+import { useStore } from '../store/useStore';
 import { AlertOctagon, RotateCcw } from 'lucide-react';
 
 const ErrorView = () => {
-  const dispatch = useDispatch();
-  const { uploadError, analysisError } = useSelector((state) => state.dataset);
+  const { uploadError, analysisError, resetState } = useStore();
   
-  const errorMsg = uploadError || analysisError || "An unknown error occurred.";
+  const rawError = uploadError || analysisError || "An unknown error occurred.";
+  const errorMsg = typeof rawError === 'object' 
+    ? (rawError.detail || rawError.message || JSON.stringify(rawError)) 
+    : String(rawError);
 
   const handleRetry = () => {
-    dispatch(resetState());
+    resetState();
   };
 
   const styles = {
@@ -76,7 +77,7 @@ const ErrorView = () => {
         <div style={styles.iconBox}>
           <AlertOctagon size={40} strokeWidth={1.5} />
         </div>
-        <h2 style={styles.title}>Analysis Failed</h2>
+        <h2 style={styles.title}>Upload or Analysis Failed</h2>
         <p style={styles.subtitle}>
           {errorMsg}
         </p>
